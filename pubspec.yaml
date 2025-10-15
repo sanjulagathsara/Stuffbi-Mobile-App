@@ -1,5 +1,5 @@
 name: stuffbi
-description: "A new Flutter project."
+description: "Personal Inventory Management System."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -34,6 +34,7 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  go_router: ^16.2.4
 
 dev_dependencies:
   flutter_test:
@@ -44,7 +45,8 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -56,6 +58,10 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/
+    
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -87,3 +93,24 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+flutter_launcher_icons:
+  android: true
+  ios: true
+  # Optional desktop/web (plugin support varies by version)
+  # web: true
+  # macos: true
+  # windows: true
+
+  image_path: assets/icons/stuffbi_logo.png  # base icon (used by iOS)
+
+  adaptive_icon_background: "#0085FA"        # Android 8+ background (brand blue)
+  adaptive_icon_foreground: assets/icons/stuffbi_logo.png
+  # Optional monochrome (Android 13+)
+  adaptive_icon_monochrome: assets/icons/stuffbi_logo.png
+
+  # iOS options
+  remove_alpha_ios: true
+  ios_create_icons: true
+
+  # Android options
+  min_sdk_android: 21
