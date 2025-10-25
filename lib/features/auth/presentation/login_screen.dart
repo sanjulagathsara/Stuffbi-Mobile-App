@@ -189,8 +189,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   Text('New here?', style: textTheme.bodyMedium),
                   TextButton(
                     onPressed: () => context.push(
-                      '/under_development',
-                    ), // TODO: push to register screen when you add it
+                      '/register',
+                    ),
                     child: const Text('Create an account'),
                   ),
                 ],
