@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:stuffbi/core/widgets/primary_button.dart';
 
 class ItemsScreen extends StatelessWidget {
   const ItemsScreen({super.key});

@@ -108,7 +108,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   // Make sure to add this image to your pubspec.yaml assets
                   Image.asset(
                     'assets/images/stuffbi_welcoming.png',
-                    height: 180, // Adjust height as needed
+                    height: 120, // Adjust height as needed
                     fit: BoxFit.contain,
                   ),
                   const SizedBox(height:12),
