@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'controllers/items_provider.dart';
+import '../../bundles/presentation/providers/bundles_provider.dart';
 import 'add_edit_item_screen.dart';
 import 'item_details_screen.dart';
 
@@ -10,8 +11,8 @@ class ItemsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ItemsProvider>(
-      builder: (context, provider, child) {
+    return Consumer2<ItemsProvider, BundlesProvider>(
+      builder: (context, provider, bundlesProvider, child) {
         return Scaffold(
           backgroundColor: Colors.white,
           appBar: AppBar(
@@ -181,23 +182,32 @@ class ItemsScreen extends StatelessWidget {
                                               ),
                                             ),
                                             const SizedBox(height: 4),
-                                            if (item.bundleId != null && item.bundleId!.isNotEmpty)
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.indigo[50],
-                                                  borderRadius: BorderRadius.circular(6),
-                                                  border: Border.all(color: Colors.indigo[100]!),
-                                                ),
-                                                child: Text(
-                                                  item.bundleId!,
-                                                  style: TextStyle(
-                                                    color: Colors.indigo[800],
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                                ),
-                                              )
+                                              if (item.bundleId != null && item.bundleId!.isNotEmpty)
+                                                Builder(
+                                                  builder: (context) {
+                                                    final bundleName = bundlesProvider.bundles
+                                                        .where((b) => b.id == item.bundleId)
+                                                        .firstOrNull
+                                                        ?.name;
+
+                                                    return Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.indigo[50],
+                                                        borderRadius: BorderRadius.circular(6),
+                                                        border: Border.all(color: Colors.indigo[100]!),
+                                                      ),
+                                                      child: Text(
+                                                        bundleName ?? 'Unknown Bundle',
+                                                        style: TextStyle(
+                                                          color: Colors.indigo[800],
+                                                          fontSize: 12,
+                                                          fontWeight: FontWeight.w500,
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                                )
                                             else
                                               const Text(
                                                 'No Bundle',
