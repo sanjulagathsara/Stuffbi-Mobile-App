@@ -1,165 +1,254 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'controllers/items_provider.dart';
+import 'add_edit_item_screen.dart';
+import 'item_details_screen.dart';
 
 class ItemsScreen extends StatelessWidget {
   const ItemsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Placeholder list of items
-    final List<DummyItem> dummyItems = [
-      DummyItem(title: 'Item name', details: 'Details'),
-      DummyItem(title: 'Item name', details: 'Details', isChecked: true),
-      DummyItem(title: 'Item name', details: 'Details'),
-      DummyItem(title: 'Item name', details: 'Details'),
-      DummyItem(title: 'Item name', details: 'Details'),
-    ];
-
-    return Scaffold(
-      backgroundColor: Colors.white, // Background color
-      appBar: AppBar(
-        backgroundColor: Colors.white, // White app bar background
-        elevation: 0, // No shadow
-        toolbarHeight: 60, // Custom height for the app bar
-        titleSpacing: 0, // Remove default title spacing
-        leadingWidth: 70, // Adjust leading width for the search icon
-        leading: IconButton(
-          icon: const Icon(Icons.search, color: Colors.black, size: 28),
-          onPressed: () {
-            // Handle search icon press
-            print('Search icon pressed');
-          },
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_circle_outline, color: Colors.black, size: 28),
-            onPressed: () {
-              // Handle add icon press
-              print('Add icon pressed');
-            },
-          ),
-          const SizedBox(width: 8), // Padding on the right
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Column(
-              children: [
-                // Search Bar
-                TextFormField(
-                  decoration: InputDecoration(
-                    hintText: 'Search',
-                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                    filled: true,
-                    fillColor: Colors.grey[200],
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none, // No border line
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 0), // Adjust vertical padding
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Items List
-          Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              itemCount: dummyItems.length,
-              separatorBuilder: (context, index) => Divider(
-                color: Colors.grey[200],
-                height: 1,
+    return Consumer<ItemsProvider>(
+      builder: (context, provider, child) {
+        return Scaffold(
+          backgroundColor: Colors.white,
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            toolbarHeight: 60,
+            titleSpacing: 0,
+            leadingWidth: 70,
+            leading: IconButton(
+              icon: Icon(
+                provider.isSelectionMode ? Icons.close : Icons.search,
+                color: Colors.black,
+                size: 28,
               ),
-              itemBuilder: (context, index) {
-                final item = dummyItems[index];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12.0),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Placeholder Image area
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200], // Light grey background
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.image_outlined,
-                            color: Colors.grey,
-                            size: 32,
+              onPressed: () {
+                if (provider.isSelectionMode) {
+                  provider.toggleSelectionMode();
+                } else {
+                  // Focus search bar or handle search action
+                }
+              },
+            ),
+            title: provider.isSelectionMode
+                ? Text(
+                    '${provider.selectedItemIds.length} Selected',
+                    style: const TextStyle(color: Colors.black),
+                  )
+                : null,
+            actions: [
+              if (provider.isSelectionMode)
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red, size: 28),
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Delete Items'),
+                        content: Text('Are you sure you want to delete ${provider.selectedItemIds.length} items?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancel'),
                           ),
-                        ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 16),
-                      // Item Details Column
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.title,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: Colors.black,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              item.details,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Icon(
-                              Icons.edit_outlined,
-                              color: Colors.blue[600], // Blue edit icon
-                              size: 20,
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Checkbox
-                      Checkbox(
-                        value: item.isChecked,
-                        onChanged: (bool? newValue) {
-                          // State change won't work in StatelessWidget
-                        },
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
+                    );
+
+                    if (confirm == true) {
+                      provider.deleteSelectedItems();
+                    }
+                  },
+                )
+              else
+                IconButton(
+                  icon: const Icon(Icons.add_circle_outline, color: Colors.black, size: 28),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const AddEditItemScreen()),
+                    );
+                  },
+                ),
+              const SizedBox(width: 8),
+            ],
+          ),
+          body: Column(
+            children: [
+              if (!provider.isSelectionMode)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        onChanged: (value) => provider.searchItems(value),
+                        decoration: InputDecoration(
+                          hintText: 'Search',
+                          prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                          filled: true,
+                          fillColor: Colors.grey[200],
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 0),
                         ),
                       ),
                     ],
                   ),
-                );
-              },
-            ),
+                ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: provider.isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : provider.items.isEmpty
+                        ? const Center(child: Text('No items found'))
+                        : ListView.separated(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                            itemCount: provider.items.length,
+                            separatorBuilder: (context, index) => Divider(
+                              color: Colors.grey[200],
+                              height: 1,
+                            ),
+                            itemBuilder: (context, index) {
+                              final item = provider.items[index];
+                              final isSelected = provider.selectedItemIds.contains(item.id);
+
+                              return GestureDetector(
+                                onLongPress: () {
+                                  provider.toggleItemSelection(item.id);
+                                },
+                                onTap: () {
+                                  if (provider.isSelectionMode) {
+                                    provider.toggleItemSelection(item.id);
+                                  } else {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ItemDetailsScreen(itemId: item.id),
+                                      ),
+                                    );
+                                  }
+                                },
+                                child: Container(
+                                  color: isSelected ? Colors.blue.withValues(alpha: 0.1) : Colors.transparent,
+                                  padding: const EdgeInsets.symmetric(vertical: 12.0),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        width: 60,
+                                        height: 60,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[200],
+                                          borderRadius: BorderRadius.circular(8),
+                                          image: item.imagePath != null
+                                              ? DecorationImage(
+                                                  image: FileImage(File(item.imagePath!)),
+                                                  fit: BoxFit.cover,
+                                                )
+                                              : null,
+                                        ),
+                                        child: item.imagePath == null
+                                            ? const Center(
+                                                child: Icon(
+                                                  Icons.image_outlined,
+                                                  color: Colors.grey,
+                                                  size: 32,
+                                                ),
+                                              )
+                                            : null,
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              item.name,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                                color: Colors.black,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            if (item.bundleId != null && item.bundleId!.isNotEmpty)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.indigo[50],
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(color: Colors.indigo[100]!),
+                                                ),
+                                                child: Text(
+                                                  item.bundleId!,
+                                                  style: TextStyle(
+                                                    color: Colors.indigo[800],
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              )
+                                            else
+                                              const Text(
+                                                'No Bundle',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey,
+                                                  fontStyle: FontStyle.italic,
+                                                ),
+                                              ),
+                                            const SizedBox(height: 8),
+                                            if (!provider.isSelectionMode)
+                                              GestureDetector(
+                                                onTap: () {
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (context) => AddEditItemScreen(item: item),
+                                                    ),
+                                                  );
+                                                },
+                                                child: Icon(
+                                                  Icons.edit_outlined,
+                                                  color: Colors.blue[600],
+                                                  size: 20,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (provider.isSelectionMode)
+                                        Checkbox(
+                                          value: isSelected,
+                                          onChanged: (bool? newValue) {
+                                            provider.toggleItemSelection(item.id);
+                                          },
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+              ),
+              const SizedBox(height: 16),
+            ],
           ),
-          const SizedBox(height: 16),
-        ],
-      ),
+        );
+      },
     );
   }
-}
-
-// Model for a dummy item
-class DummyItem {
-  String title;
-  String details;
-  bool isChecked;
-
-  DummyItem({
-    required this.title,
-    required this.details,
-    this.isChecked = false,
-  });
 }

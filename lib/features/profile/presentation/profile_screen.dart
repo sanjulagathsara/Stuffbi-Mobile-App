@@ -28,7 +28,7 @@ class ProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             const Text(
-              'John Doe', // TODO: Replace with actual user name
+              'Guest Profile', // TODO: Replace with actual user name
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 22,
@@ -36,7 +36,7 @@ class ProfileScreen extends StatelessWidget {
               ),
             ),
             const Text(
-              'john.doe@example.com', // TODO: Replace with actual user email
+              'guest.@example.com', // TODO: Replace with actual user email
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
