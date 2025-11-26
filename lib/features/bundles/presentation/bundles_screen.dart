@@ -114,7 +114,7 @@ class _BundlesScreenState extends State<BundlesScreen> {
                               ),
                               const PopupMenuItem(
                                 value: 'recent',
-                                child: Text('Recently Accessed'),
+                                child: Text('Recently Added'),
                               ),
                             ],
                             child: Container(
@@ -165,7 +165,7 @@ class _BundlesScreenState extends State<BundlesScreen> {
                     crossAxisCount: 2,
                     crossAxisSpacing: 16.0,
                     mainAxisSpacing: 16.0,
-                    childAspectRatio: 0.65, // Changed from 0.75
+                    childAspectRatio: 0.5, // Adjusted to prevent overflow
                   ),
                   itemCount: bundlesProvider.bundles.length,
                   itemBuilder: (context, index) {
@@ -238,13 +238,13 @@ class BundleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 0,
+      elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
         side: BorderSide(color: Colors.grey[200]!),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(12.0), // Reduced padding
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -252,7 +252,7 @@ class BundleCard extends StatelessWidget {
             Stack(
               children: [
                 Container(
-                  height: 400, 
+                  height: 180, // Reduced height
                   width: double.infinity,
                   decoration: BoxDecoration(
                     color: Colors.grey[50],
@@ -291,14 +291,14 @@ class BundleCard extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12), // Reduced spacing
             Text(
               title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 25,
+                fontSize: 20,
                 color: Colors.black,
               ),
             ),
@@ -308,10 +308,11 @@ class BundleCard extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontSize: 18,
+                fontSize: 14,
                 color: Colors.grey,
               ),
             ),
+            const Spacer(),
             Align(
               alignment: Alignment.bottomRight,
               child: GestureDetector(
@@ -319,7 +320,7 @@ class BundleCard extends StatelessWidget {
                 child: Icon(
                   Icons.edit_outlined,
                   color: Colors.blue[500],
-                  size: 24, // Slightly larger icon
+                  size: 24,
                 ),
               ),
             ),

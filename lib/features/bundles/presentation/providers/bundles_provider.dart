@@ -117,7 +117,6 @@ class BundlesProvider extends ChangeNotifier {
     } else if (_sortOrder == 'recent') {
       // For "recently accessed", we ideally need a last_accessed or last_updated timestamp.
       // Since we don't have that yet, we can't strictly implement it without schema change.
-      // However, the user asked to "check the possibility with database if it can detect the lastly item added bundle".
       // This would require a complex query joining items and grouping by bundle.
       // For now, let's reverse the list as a proxy for "newest created" if IDs are time-ordered (UUID v4 is random though).
       // Or we can just leave it as is or implement a simple name desc.
