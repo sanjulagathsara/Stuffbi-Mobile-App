@@ -6,8 +6,21 @@ import '../../bundles/presentation/providers/bundles_provider.dart';
 import 'add_edit_item_screen.dart';
 import 'item_details_screen.dart';
 
-class ItemsScreen extends StatelessWidget {
+class ItemsScreen extends StatefulWidget {
   const ItemsScreen({super.key});
+
+  @override
+  State<ItemsScreen> createState() => _ItemsScreenState();
+}
+
+class _ItemsScreenState extends State<ItemsScreen> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,20 +34,18 @@ class ItemsScreen extends StatelessWidget {
             toolbarHeight: 60,
             titleSpacing: 0,
             leadingWidth: 70,
-            leading: IconButton(
-              icon: Icon(
-                provider.isSelectionMode ? Icons.close : Icons.search,
-                color: Colors.black,
-                size: 28,
-              ),
-              onPressed: () {
-                if (provider.isSelectionMode) {
-                  provider.toggleSelectionMode();
-                } else {
-                  // Focus search bar or handle search action
-                }
-              },
-            ),
+            leading: provider.isSelectionMode
+                ? IconButton(
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.black,
+                      size: 28,
+                    ),
+                    onPressed: () {
+                      provider.toggleSelectionMode();
+                    },
+                  )
+                : null,
             title: provider.isSelectionMode
                 ? Text(
                     '${provider.selectedItemIds.length} Selected',
@@ -90,10 +101,24 @@ class ItemsScreen extends StatelessWidget {
                   child: Column(
                     children: [
                       TextFormField(
-                        onChanged: (value) => provider.searchItems(value),
+                        controller: _searchController,
+                        onChanged: (value) {
+                          provider.searchItems(value);
+                          setState(() {}); // Rebuild to show/hide clear icon
+                        },
                         decoration: InputDecoration(
                           hintText: 'Search',
                           prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, color: Colors.grey),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    provider.searchItems('');
+                                    setState(() {});
+                                  },
+                                )
+                              : null,
                           filled: true,
                           fillColor: Colors.grey[200],
                           border: OutlineInputBorder(

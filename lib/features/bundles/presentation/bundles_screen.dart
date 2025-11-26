@@ -13,27 +13,38 @@ class BundlesScreen extends StatefulWidget {
 }
 
 class _BundlesScreenState extends State<BundlesScreen> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 0,
+        elevation: 5,
         toolbarHeight: 60,
         titleSpacing: 0,
         leadingWidth: 70,
-        leading: IconButton(
-          icon: const Icon(Icons.search, color: Colors.black, size: 28),
-          onPressed: () {
-            // Handle search icon press
-          },
-        ),
+        leading: null,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.favorite_border, color: Colors.black, size: 28),
-            onPressed: () {
-              // Handle favorite icon press
+          Consumer<BundlesProvider>(
+            builder: (context, provider, child) {
+              return IconButton(
+                icon: Icon(
+                  provider.showFavoritesOnly ? Icons.favorite : Icons.favorite_border,
+                  color: provider.showFavoritesOnly ? Colors.red : Colors.black,
+                  size: 28,
+                ),
+                onPressed: () {
+                  provider.toggleShowFavoritesOnly();
+                },
+              );
             },
           ),
           IconButton(
@@ -52,84 +63,84 @@ class _BundlesScreenState extends State<BundlesScreen> {
             child: Column(
               children: [
                 // Search Bar
-                TextFormField(
-                  decoration: InputDecoration(
-                    hintText: 'Search',
-                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                    filled: true,
-                    fillColor: Colors.grey[200],
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                  ),
+                Consumer<BundlesProvider>(
+                  builder: (context, provider, child) {
+                    return TextFormField(
+                      controller: _searchController,
+                      onChanged: (value) {
+                        provider.searchBundles(value);
+                        setState(() {});
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Search',
+                        prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, color: Colors.grey),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  provider.searchBundles('');
+                                  setState(() {});
+                                },
+                              )
+                            : null,
+                        filled: true,
+                        fillColor: Colors.grey[200],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
 
                 // Sort and Filter Row
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          // Handle sort
-                        },
-                        icon: const Icon(Icons.sort, color: Colors.black),
-                        label: const Text('Sort', style: TextStyle(color: Colors.black)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            side: BorderSide(color: Colors.grey[300]!),
-                          ),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          // Handle filter
-                        },
-                        icon: const Icon(Icons.filter_list, color: Colors.black),
-                        label: Row(
-                          children: [
-                            const Text('Filter', style: TextStyle(color: Colors.black)),
-                            const SizedBox(width: 4),
-                            // Filter count badge
-                            Container(
-                              padding: const EdgeInsets.all(4),
+                Consumer<BundlesProvider>(
+                  builder: (context, provider, child) {
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: PopupMenuButton<String>(
+                            onSelected: (value) {
+                              provider.setSortOrder(value);
+                            },
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(
+                                value: 'asc',
+                                child: Text('Name (A-Z)'),
+                              ),
+                              const PopupMenuItem(
+                                value: 'recent',
+                                child: Text('Recently Accessed'),
+                              ),
+                            ],
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               decoration: BoxDecoration(
-                                color: Colors.blue,
-                                borderRadius: BorderRadius.circular(10),
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey[300]!),
                               ),
-                              constraints: const BoxConstraints(
-                                minWidth: 20,
-                                minHeight: 20,
-                              ),
-                              child: const Text(
-                                '2',
-                                style: TextStyle(color: Colors.white, fontSize: 12),
-                                textAlign: TextAlign.center,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.sort, color: Colors.black),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    provider.sortOrder == 'asc' ? 'Name (A-Z)' : 'Recent',
+                                    style: const TextStyle(color: Colors.black),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            side: BorderSide(color: Colors.grey[300]!),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
-                      ),
-                    ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
@@ -145,7 +156,7 @@ class _BundlesScreenState extends State<BundlesScreen> {
                 }
                 
                 if (bundlesProvider.bundles.isEmpty) {
-                  return const Center(child: Text('No bundles created yet.'));
+                  return const Center(child: Text('No bundles found.'));
                 }
 
                 return GridView.builder(
@@ -154,7 +165,7 @@ class _BundlesScreenState extends State<BundlesScreen> {
                     crossAxisCount: 2,
                     crossAxisSpacing: 16.0,
                     mainAxisSpacing: 16.0,
-                    childAspectRatio: 0.75,
+                    childAspectRatio: 0.65, // Changed from 0.75
                   ),
                   itemCount: bundlesProvider.bundles.length,
                   itemBuilder: (context, index) {
@@ -163,10 +174,38 @@ class _BundlesScreenState extends State<BundlesScreen> {
                       onTap: () {
                          context.push('/bundle_details', extra: bundle);
                       },
+                      onLongPress: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Bundle Options'),
+                            content: Text(bundle.isFavorite
+                                ? 'Remove from favorites?'
+                                : 'Add to favorites?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  bundlesProvider.toggleFavorite(bundle.id);
+                                  Navigator.pop(context);
+                                },
+                                child: Text(bundle.isFavorite ? 'Remove' : 'Add'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                       child: BundleCard(
                         title: bundle.name,
                         subtitle: bundle.description,
                         imagePath: bundle.imagePath,
+                        isFavorite: bundle.isFavorite,
+                        onEdit: () {
+                          context.push('/add_bundle', extra: bundle);
+                        },
                       ),
                     );
                   },
@@ -184,12 +223,16 @@ class BundleCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final String? imagePath;
+  final bool isFavorite;
+  final VoidCallback? onEdit;
 
   const BundleCard({
     Key? key,
     required this.title,
     required this.subtitle,
     this.imagePath,
+    this.isFavorite = false,
+    this.onEdit,
   }) : super(key: key);
 
   @override
@@ -197,51 +240,65 @@ class BundleCard extends StatelessWidget {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: Colors.grey[200]!),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Image area
-            Container(
-              height: 100,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: imagePath != null
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        File(imagePath!),
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Center(
-                            child: Icon(Icons.broken_image, color: Colors.grey),
-                          );
-                        },
-                      ),
-                    )
-                  : const Center(
-                      child: Icon(
-                        Icons.image_outlined,
-                        color: Colors.grey,
-                        size: 48,
-                      ),
+            Stack(
+              children: [
+                Container(
+                  height: 400, 
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: imagePath != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.file(
+                            File(imagePath!),
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Center(
+                                child: Icon(Icons.broken_image, color: Colors.blue),
+                              );
+                            },
+                          ),
+                        )
+                      : const Center(
+                          child: Icon(
+                            Icons.image_outlined,
+                            color: Colors.blue,
+                            size: 48,
+                          ),
+                        ),
+                ),
+                if (isFavorite)
+                  const Positioned(
+                    top: 4,
+                    right: 4,
+                    child: Icon(
+                      Icons.favorite,
+                      color: Colors.red,
+                      size: 30,
                     ),
+                  ),
+              ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
             Text(
               title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
-                fontSize: 16,
+                fontSize: 25,
                 color: Colors.black,
               ),
             ),
@@ -251,17 +308,19 @@ class BundleCard extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontSize: 14,
+                fontSize: 18,
                 color: Colors.grey,
               ),
             ),
-            const Spacer(),
             Align(
               alignment: Alignment.bottomRight,
-              child: Icon(
-                Icons.edit_outlined,
-                color: Colors.blue[600],
-                size: 20,
+              child: GestureDetector(
+                onTap: onEdit,
+                child: Icon(
+                  Icons.edit_outlined,
+                  color: Colors.blue[500],
+                  size: 24, // Slightly larger icon
+                ),
               ),
             ),
           ],

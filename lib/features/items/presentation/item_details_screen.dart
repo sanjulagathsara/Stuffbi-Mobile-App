@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/item_model.dart';
 import 'controllers/items_provider.dart';
+import '../../bundles/presentation/providers/bundles_provider.dart';
+import '../../bundles/models/bundle_model.dart';
 import 'add_edit_item_screen.dart';
 
 class ItemDetailsScreen extends StatelessWidget {
@@ -119,9 +121,17 @@ class ItemDetailsScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     if (item.bundleId != null)
-                      Chip(
-                        label: Text(item.bundleId!),
-                        backgroundColor: Colors.green[100],
+                      Consumer<BundlesProvider>(
+                        builder: (context, bundlesProvider, child) {
+                          final bundle = bundlesProvider.bundles.firstWhere(
+                            (b) => b.id == item.bundleId,
+                            orElse: () => Bundle(id: '', name: 'Unknown Bundle', description: ''),
+                          );
+                          return Chip(
+                            label: Text(bundle.name),
+                            backgroundColor: Colors.green[100],
+                          );
+                        },
                       ),
                   ],
                 ),

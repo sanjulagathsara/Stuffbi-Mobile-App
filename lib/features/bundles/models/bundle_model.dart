@@ -4,6 +4,7 @@ class Bundle {
   final String description;
   final String? imagePath;
   final bool isSynced;
+  final bool isFavorite;
 
   Bundle({
     required this.id,
@@ -11,6 +12,7 @@ class Bundle {
     required this.description,
     this.imagePath,
     this.isSynced = false,
+    this.isFavorite = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -20,6 +22,7 @@ class Bundle {
       'description': description,
       'imagePath': imagePath,
       'isSynced': isSynced ? 1 : 0,
+      'is_favorite': isFavorite ? 1 : 0,
     };
   }
 
@@ -30,6 +33,7 @@ class Bundle {
       description: map['description'],
       imagePath: map['imagePath'],
       isSynced: map['isSynced'] == 1,
+      isFavorite: map['is_favorite'] == 1,
     );
   }
 
@@ -39,6 +43,7 @@ class Bundle {
     String? description,
     String? imagePath,
     bool? isSynced,
+    bool? isFavorite,
   }) {
     return Bundle(
       id: id ?? this.id,
@@ -46,6 +51,7 @@ class Bundle {
       description: description ?? this.description,
       imagePath: imagePath ?? this.imagePath,
       isSynced: isSynced ?? this.isSynced,
+      isFavorite: isFavorite ?? this.isFavorite,
     );
   }
 }

@@ -27,7 +27,7 @@ class DatabaseHelper {
     debugPrint('Database path: $path'); // Print path for debugging
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -51,7 +51,8 @@ class DatabaseHelper {
         name TEXT,
         description TEXT,
         imagePath TEXT,
-        isSynced INTEGER
+        isSynced INTEGER,
+        is_favorite INTEGER DEFAULT 0
       )
     ''');
   }
@@ -67,6 +68,15 @@ class DatabaseHelper {
           isSynced INTEGER
         )
       ''');
+    }
+    if (oldVersion < 3) {
+      // Check if column exists before adding to avoid errors if re-running
+      // But for simple migration we can just try-catch or assume it's needed
+      try {
+        await db.execute('ALTER TABLE bundles ADD COLUMN is_favorite INTEGER DEFAULT 0');
+      } catch (e) {
+        debugPrint('Error adding is_favorite column: $e');
+      }
     }
   }
 }
