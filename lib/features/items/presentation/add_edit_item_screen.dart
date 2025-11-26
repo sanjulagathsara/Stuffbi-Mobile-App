@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/item_model.dart';
 import 'controllers/items_provider.dart';
+import '../../bundles/presentation/providers/bundles_provider.dart';
 
 class AddEditItemScreen extends StatefulWidget {
   final Item? item;
@@ -19,11 +20,10 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   late TextEditingController _nameController;
   late TextEditingController _detailsController;
   String? _selectedCategory;
-  String? _selectedBundle; // Placeholder for now
+  String? _selectedBundleId;
   String? _imagePath;
 
   final List<String> _categories = ['Electronics', 'Clothing', 'Books', 'Furniture', 'University', 'Other'];
-  final List<String> _bundles = ['Default Bundle', 'Travel Bundle', 'Work Bundle']; // Dummy bundles
 
   @override
   void initState() {
@@ -31,8 +31,13 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
     _nameController = TextEditingController(text: widget.item?.name ?? '');
     _detailsController = TextEditingController(text: widget.item?.details ?? '');
     _selectedCategory = widget.item?.category;
-    _selectedBundle = widget.item?.bundleId;
+    _selectedBundleId = widget.item?.bundleId;
     _imagePath = widget.item?.imagePath;
+    
+    // Load bundles if not already loaded
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<BundlesProvider>(context, listen: false).loadBundles();
+    });
   }
 
   @override
@@ -72,7 +77,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
             _selectedCategory ?? 'Other',
             _detailsController.text,
             _imagePath,
-            _selectedBundle,
+            _selectedBundleId,
           );
         } else {
           await provider.updateItem(
@@ -81,7 +86,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
               category: _selectedCategory ?? 'Other',
               details: _detailsController.text,
               imagePath: _imagePath,
-              bundleId: _selectedBundle,
+              bundleId: _selectedBundleId,
             ),
           );
         }
@@ -180,22 +185,33 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                 },
               ),
               const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _selectedBundle,
-                decoration: const InputDecoration(
-                  labelText: 'Current Bundle',
-                  border: OutlineInputBorder(),
-                ),
-                items: _bundles.map((bundle) {
-                  return DropdownMenuItem(
-                    value: bundle,
-                    child: Text(bundle),
+              Consumer<BundlesProvider>(
+                builder: (context, bundlesProvider, child) {
+                  final bundles = bundlesProvider.bundles;
+                  return DropdownButtonFormField<String>(
+                    value: _selectedBundleId,
+                    decoration: const InputDecoration(
+                      labelText: 'Current Bundle',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      const DropdownMenuItem<String>(
+                        value: null,
+                        child: Text('None'),
+                      ),
+                      ...bundles.map((bundle) {
+                        return DropdownMenuItem(
+                          value: bundle.id,
+                          child: Text(bundle.name),
+                        );
+                      }),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedBundleId = value;
+                      });
+                    },
                   );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedBundle = value;
-                  });
                 },
               ),
               const SizedBox(height: 16),

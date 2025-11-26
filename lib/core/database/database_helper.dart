@@ -27,8 +27,9 @@ class DatabaseHelper {
     debugPrint('Database path: $path'); // Print path for debugging
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -44,5 +45,28 @@ class DatabaseHelper {
         isSynced INTEGER
       )
     ''');
+    await db.execute('''
+      CREATE TABLE bundles(
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        description TEXT,
+        imagePath TEXT,
+        isSynced INTEGER
+      )
+    ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+        CREATE TABLE bundles(
+          id TEXT PRIMARY KEY,
+          name TEXT,
+          description TEXT,
+          imagePath TEXT,
+          isSynced INTEGER
+        )
+      ''');
+    }
   }
 }

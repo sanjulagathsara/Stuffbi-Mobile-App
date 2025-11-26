@@ -60,4 +60,15 @@ class Item {
       isSynced: isSynced ?? this.isSynced,
     );
   }
+  Item unassignBundle() {
+    return Item(
+      id: id,
+      name: name,
+      category: category,
+      bundleId: null,
+      imagePath: imagePath,
+      details: details,
+      isSynced: isSynced,
+    );
+  }
 }
