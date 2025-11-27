@@ -17,6 +17,7 @@ class BundleDetailsScreen extends StatefulWidget {
 
 class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
   bool _isDragMode = false;
+  bool _isDraggingItem = false;
   final Set<String> _selectedItemIds = {};
 
   Future<void> _removeSelectedItems() async {
@@ -241,6 +242,16 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
                   },
                 ),
               ],
+              if (_selectedItemIds.isEmpty)
+                IconButton(
+                  icon: const Icon(Icons.checklist),
+                  tooltip: 'Select Items',
+                  onPressed: () {
+                    setState(() {
+                      _isDragMode = true;
+                    });
+                  },
+                ),
               PopupMenuButton<String>(
                 onSelected: (value) async {
                   if (value == 'reset') {
@@ -271,8 +282,10 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
               ),
             ],
           ),
-          body: Column(
+          body: Stack(
             children: [
+              Column(
+                children: [
               // Bundle Info Header
               Container(
                 padding: const EdgeInsets.all(16),
@@ -347,21 +360,72 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
                                   }
                                 });
                               } else {
-                                // Navigate to item details or show preview
-                                // For now, let's make single tap toggle check if not in selection mode
-                                // Or maybe we want a dedicated button? 
-                                // Requirement says "green button inside the bundle named 'check' or suitable icon"
-                                // Let's add the button in the card, but maybe tapping the card opens details?
-                                // For now, let's just keep selection logic separate.
+                                // Toggle check on tap if not in selection mode
+                                Provider.of<ItemsProvider>(context, listen: false).toggleItemCheck(item.id);
                               }
                             },
                             onLongPress: () {
-                              setState(() {
-                                _isDragMode = true;
-                                _selectedItemIds.add(item.id);
-                              });
+                              // If we want to keep long press for selection when NOT dragging, 
+                              // we might need a listener or different gesture.
+                              // But LongPressDraggable usually consumes it.
+                              // We'll rely on the "Select Items" button or just drag.
                             },
-                            child: _buildItemCard(item, isSelected),
+                            child: LongPressDraggable<String>(
+                              data: item.id,
+                              delay: const Duration(milliseconds: 150), // Reduced delay for better responsiveness
+                              onDragStarted: () {
+                                setState(() {
+                                  _isDraggingItem = true;
+                                });
+                              },
+                              onDragEnd: (details) {
+                                setState(() {
+                                  _isDraggingItem = false;
+                                });
+                              },
+                              onDraggableCanceled: (velocity, offset) {
+                                setState(() {
+                                  _isDraggingItem = false;
+                                });
+                              },
+                              feedback: Material(
+                                color: Colors.transparent,
+                                child: _selectedItemIds.contains(item.id) && _selectedItemIds.length > 1
+                                    ? Container(
+                                        width: 150,
+                                        height: 150,
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(12),
+                                          boxShadow: [
+                                            BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, spreadRadius: 2),
+                                          ],
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            const Icon(Icons.layers, size: 48, color: Colors.blue),
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              '${_selectedItemIds.length} Items',
+                                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    : SizedBox(
+                                        width: 150,
+                                        height: 150,
+                                        child: _buildItemCard(item, false),
+                                      ),
+                              ),
+                              childWhenDragging: Opacity(
+                                opacity: 0.5,
+                                child: _buildItemCard(item, isSelected),
+                              ),
+                              child: _buildItemCard(item, isSelected),
+                            ),
                         );
                       },
                     );
@@ -370,7 +434,120 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
               ),
             ],
           ),
-        );
+          if (_isDraggingItem)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 120,
+              child: Container(
+                color: Colors.black.withOpacity(0.8),
+                padding: const EdgeInsets.all(8),
+                // Ensure hit test works
+                alignment: Alignment.topLeft,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(left: 8.0, bottom: 8.0),
+                      child: Text(
+                        'Drop to move to...',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    Expanded(
+                      child: Consumer<BundlesProvider>(
+                        builder: (context, bundlesProvider, child) {
+                          final otherBundles = bundlesProvider.bundles
+                              .where((b) => b.id != widget.bundle.id)
+                              .toList();
+
+                          if (otherBundles.isEmpty) {
+                            return const Center(child: Text('No other bundles', style: TextStyle(color: Colors.white)));
+                          }
+
+                          return ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: otherBundles.length,
+                            separatorBuilder: (context, index) => const SizedBox(width: 12),
+                            itemBuilder: (context, index) {
+                              final targetBundle = otherBundles[index];
+                              return DragTarget<String>(
+                                onWillAccept: (data) => true,
+                                onAccept: (itemId) async {
+                                  List<String> itemsToMove = [itemId];
+                                  if (_selectedItemIds.contains(itemId)) {
+                                    itemsToMove = _selectedItemIds.toList();
+                                  }
+
+                                  await Provider.of<BundlesProvider>(context, listen: false)
+                                      .moveItemsToBundle(targetBundle.id, itemsToMove);
+                                  
+                                  if (mounted) {
+                                    await Provider.of<ItemsProvider>(context, listen: false).loadItems();
+                                    
+                                    // Clear selection if we moved selected items
+                                    if (_selectedItemIds.contains(itemId)) {
+                                      setState(() {
+                                        _selectedItemIds.clear();
+                                        _isDragMode = false;
+                                      });
+                                    }
+
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Moved ${itemsToMove.length} items to ${targetBundle.name}')),
+                                    );
+                                  }
+                                },
+                                builder: (context, candidateData, rejectedData) {
+                                  final isHovered = candidateData.isNotEmpty;
+                                  return Container(
+                                    width: 100,
+                                    decoration: BoxDecoration(
+                                      color: isHovered ? Colors.blue.withOpacity(0.5) : Colors.grey[800],
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: isHovered ? Border.all(color: Colors.blue, width: 2) : null,
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        if (targetBundle.imagePath != null)
+                                          ClipRRect(
+                                            borderRadius: BorderRadius.circular(8),
+                                            child: Image.file(
+                                              File(targetBundle.imagePath!),
+                                              width: 40,
+                                              height: 40,
+                                              fit: BoxFit.cover,
+                                            ),
+                                          )
+                                        else
+                                          const Icon(Icons.folder, color: Colors.white),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          targetBundle.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
       },
     );
   }
