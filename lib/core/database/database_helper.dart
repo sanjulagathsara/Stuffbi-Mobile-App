@@ -27,7 +27,7 @@ class DatabaseHelper {
     debugPrint('Database path: $path'); // Print path for debugging
     return await openDatabase(
       path,
-      version: 3,
+      version: 5,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -42,7 +42,9 @@ class DatabaseHelper {
         bundleId TEXT,
         imagePath TEXT,
         details TEXT,
-        isSynced INTEGER
+        isSynced INTEGER,
+        is_checked INTEGER DEFAULT 0,
+        last_checked_at TEXT
       )
     ''');
     await db.execute('''
@@ -76,6 +78,20 @@ class DatabaseHelper {
         await db.execute('ALTER TABLE bundles ADD COLUMN is_favorite INTEGER DEFAULT 0');
       } catch (e) {
         debugPrint('Error adding is_favorite column: $e');
+      }
+    }
+    if (oldVersion < 4) {
+      try {
+        await db.execute('ALTER TABLE items ADD COLUMN is_checked INTEGER DEFAULT 0');
+      } catch (e) {
+        debugPrint('Error adding is_checked column: $e');
+      }
+    }
+    if (oldVersion < 5) {
+      try {
+        await db.execute('ALTER TABLE items ADD COLUMN last_checked_at TEXT');
+      } catch (e) {
+        debugPrint('Error adding last_checked_at column: $e');
       }
     }
   }

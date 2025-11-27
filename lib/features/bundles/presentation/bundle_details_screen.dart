@@ -241,6 +241,34 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
                   },
                 ),
               ],
+              PopupMenuButton<String>(
+                onSelected: (value) async {
+                  if (value == 'reset') {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Reset Checklist'),
+                        content: const Text('Uncheck all items in this bundle?'),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Reset')),
+                        ],
+                      ),
+                    );
+
+                    if (confirm == true && mounted) {
+                      await Provider.of<ItemsProvider>(context, listen: false).resetBundleChecklist(bundle.id);
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Checklist reset')));
+                    }
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'reset',
+                    child: Text('Reset Checklist'),
+                  ),
+                ],
+              ),
             ],
           ),
           body: Column(
@@ -320,6 +348,11 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
                                 });
                               } else {
                                 // Navigate to item details or show preview
+                                // For now, let's make single tap toggle check if not in selection mode
+                                // Or maybe we want a dedicated button? 
+                                // Requirement says "green button inside the bundle named 'check' or suitable icon"
+                                // Let's add the button in the card, but maybe tapping the card opens details?
+                                // For now, let's just keep selection logic separate.
                               }
                             },
                             onLongPress: () {
@@ -342,51 +375,109 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
     );
   }
 
+  String _getTimeAgo(DateTime dateTime) {
+    final difference = DateTime.now().difference(dateTime);
+    if (difference.inDays > 0) {
+      return '${difference.inDays}d ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return 'Just now';
+    }
+  }
+
   Widget _buildItemCard(dynamic item, bool isSelected) {
     return Card(
-      color: isSelected ? Colors.blue[50] : Colors.white,
+      color: isSelected ? Colors.blue[50] : (item.isChecked ? Colors.green[50] : Colors.white),
+      elevation: item.isChecked ? 1 : 4,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: isSelected ? const BorderSide(color: Colors.blue, width: 2) : BorderSide.none,
+        side: isSelected 
+            ? const BorderSide(color: Colors.blue, width: 2) 
+            : (item.isChecked ? BorderSide(color: Colors.green.withOpacity(0.5), width: 1) : BorderSide.none),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                image: item.imagePath != null
-                    ? DecorationImage(
-                        image: FileImage(File(item.imagePath!)),
-                        fit: BoxFit.cover,
-                      )
-                    : null,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                    image: item.imagePath != null
+                        ? DecorationImage(
+                            image: FileImage(File(item.imagePath!)),
+                            fit: BoxFit.cover,
+                            colorFilter: item.isChecked 
+                                ? ColorFilter.mode(Colors.white.withOpacity(0.6), BlendMode.srcOver) 
+                                : null,
+                          )
+                        : null,
+                  ),
+                  child: item.imagePath == null
+                      ? const Center(child: Icon(Icons.image, color: Colors.grey))
+                      : null,
+                ),
               ),
-              child: item.imagePath == null
-                  ? const Center(child: Icon(Icons.image, color: Colors.grey))
-                  : null,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        decoration: item.isChecked ? TextDecoration.lineThrough : null,
+                        color: item.isChecked ? Colors.grey : Colors.black,
+                      ),
+                    ),
+                    Text(
+                      item.category,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    if (item.isChecked && item.lastCheckedAt != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4.0),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.access_time, size: 12, color: Colors.green),
+                            const SizedBox(width: 4),
+                            Text(
+                              _getTimeAgo(item.lastCheckedAt!),
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Colors.green,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
                 ),
-                Text(
-                  item.category,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
+          if (!_isDragMode && _selectedItemIds.isEmpty)
+            Positioned(
+              bottom: 4,
+              right: 4,
+              child: IconButton(
+                icon: Icon(
+                  item.isChecked ? Icons.check_circle : Icons.check_circle_outline,
+                  color: item.isChecked ? Colors.green : Colors.grey,
+                ),
+                onPressed: () {
+                  Provider.of<ItemsProvider>(context, listen: false).toggleItemCheck(item.id);
+                },
+              ),
+            ),
         ],
       ),
     );

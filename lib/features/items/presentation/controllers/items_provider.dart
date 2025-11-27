@@ -98,4 +98,42 @@ class ItemsProvider extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  Future<void> toggleItemCheck(String itemId) async {
+    final index = _items.indexWhere((item) => item.id == itemId);
+    if (index != -1) {
+      final item = _items[index];
+      final isChecking = !item.isChecked;
+      final updatedItem = item.copyWith(
+        isChecked: isChecking,
+        lastCheckedAt: isChecking ? DateTime.now() : null,
+      );
+      
+      // Optimistic update
+      _items[index] = updatedItem;
+      _applySearch();
+      notifyListeners();
+
+      await _repository.updateItem(updatedItem);
+    }
+  }
+
+  Future<void> resetBundleChecklist(String bundleId) async {
+    final bundleItems = _items.where((item) => item.bundleId == bundleId && item.isChecked).toList();
+    
+    for (var item in bundleItems) {
+      final updatedItem = item.copyWith(
+        isChecked: false,
+        lastCheckedAt: null,
+      );
+      // Optimistic update
+      final index = _items.indexWhere((i) => i.id == item.id);
+      if (index != -1) {
+        _items[index] = updatedItem;
+      }
+      await _repository.updateItem(updatedItem);
+    }
+    _applySearch();
+    notifyListeners();
+  }
 }

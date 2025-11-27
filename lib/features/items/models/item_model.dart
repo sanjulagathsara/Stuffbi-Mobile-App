@@ -6,6 +6,8 @@ class Item {
   final String? imagePath;
   final String details;
   final bool isSynced;
+  final bool isChecked;
+  final DateTime? lastCheckedAt;
 
   Item({
     required this.id,
@@ -15,6 +17,8 @@ class Item {
     this.imagePath,
     required this.details,
     this.isSynced = false,
+    this.isChecked = false,
+    this.lastCheckedAt,
   });
 
   Map<String, dynamic> toMap() {
@@ -26,6 +30,8 @@ class Item {
       'imagePath': imagePath,
       'details': details,
       'isSynced': isSynced ? 1 : 0,
+      'is_checked': isChecked ? 1 : 0,
+      'last_checked_at': lastCheckedAt?.toIso8601String(),
     };
   }
 
@@ -38,6 +44,8 @@ class Item {
       imagePath: map['imagePath'],
       details: map['details'],
       isSynced: map['isSynced'] == 1,
+      isChecked: map['is_checked'] == 1,
+      lastCheckedAt: map['last_checked_at'] != null ? DateTime.parse(map['last_checked_at']) : null,
     );
   }
 
@@ -49,6 +57,8 @@ class Item {
     String? imagePath,
     String? details,
     bool? isSynced,
+    bool? isChecked,
+    DateTime? lastCheckedAt,
   }) {
     return Item(
       id: id ?? this.id,
@@ -58,6 +68,8 @@ class Item {
       imagePath: imagePath ?? this.imagePath,
       details: details ?? this.details,
       isSynced: isSynced ?? this.isSynced,
+      isChecked: isChecked ?? this.isChecked,
+      lastCheckedAt: lastCheckedAt ?? this.lastCheckedAt,
     );
   }
   Item unassignBundle() {
@@ -69,6 +81,8 @@ class Item {
       imagePath: imagePath,
       details: details,
       isSynced: isSynced,
+      isChecked: isChecked,
+      lastCheckedAt: lastCheckedAt,
     );
   }
 }
