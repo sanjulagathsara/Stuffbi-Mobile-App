@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../data/auth_repository_impl.dart';
+import '../data/auth_api.dart';
+
+final controller = LoginController();
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -37,13 +41,25 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
     setState(() => _busy = true);
 
-    // TODO: integrate real auth
-    await Future.delayed(const Duration(milliseconds: 600));
+    final error = await controller.login(
+      _emailCtrl.text.trim(),
+      _pwCtrl.text.trim(),
+    );
 
     if (!mounted) return;
     setState(() => _busy = false);
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    // SUCCESS → Navigate to home
     context.go('/bundles');
   }
 
@@ -70,10 +86,10 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               const SizedBox(height: 8),
               Image.asset(
-                    'assets/images/stuffbi_welcoming.png',
-                    height: 180, // Adjust height as needed
-                    fit: BoxFit.contain,
-                  ),
+                'assets/images/stuffbi_welcoming.png',
+                height: 180, // Adjust height as needed
+                fit: BoxFit.contain,
+              ),
               Text(
                 'Welcome!',
                 style: textTheme.headlineMedium?.copyWith(
@@ -124,13 +140,16 @@ class _LoginScreenState extends State<LoginScreen> {
                             hintText: 'Password',
                             prefixIcon: const Icon(Icons.lock_outline),
                             suffixIcon: IconButton(
-                              onPressed: () => setState(() => _obscure = !_obscure),
+                              onPressed: () =>
+                                  setState(() => _obscure = !_obscure),
                               icon: Icon(
-                                _obscure ? Icons.visibility_off : Icons.visibility,
+                                _obscure
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
                               ),
                             ),
                             border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                           validator: _pwValidator,
@@ -175,13 +194,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: const Text('Continue as Guest'),
                 ),
               ),
+
               // // Continue as Guest
               // OutlinedButton.icon(
               //   onPressed: () => context.go('/bundles'),
               //   icon: const Icon(Icons.person_outline),
               //   label: const Text('Continue as Guest'),
               // ),
-
               const SizedBox(height: 8),
 
               // Social row placeholder
@@ -225,9 +244,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   Text('New here?', style: textTheme.bodyMedium),
                   TextButton(
-                    onPressed: () => context.push(
-                      '/register',
-                    ),
+                    onPressed: () => context.push('/register'),
                     child: const Text('Create an account'),
                   ),
                 ],
@@ -237,5 +254,18 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
     );
+  }
+}
+
+class LoginController {
+  final repo = AuthRepositoryImpl(AuthApi());
+
+  Future<String?> login(String email, String password) async {
+    try {
+      await repo.login(email, password); // Stores token internally
+      return null; // success
+    } catch (e) {
+      return e.toString();
+    }
   }
 }

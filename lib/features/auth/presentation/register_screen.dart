@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../auth/data/auth_api.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({Key? key}) : super(key: key);
@@ -11,6 +12,7 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   // Form key for validation
   final _formKey = GlobalKey<FormState>();
+  final AuthApi authApi = AuthApi();
 
   // Controllers for form fields
   final _firstNameCtrl = TextEditingController();
@@ -45,25 +47,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) {
-      return; // If form is not valid, do nothing
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() => _busy = true);
 
-    // --- YOUR SIGN-UP LOGIC GOES HERE ---
-    // For example, call Firebase Auth, your API, etc.
-    // We'll just simulate a network call
-    await Future.delayed(const Duration(milliseconds: 700));
-    // --- END OF YOUR LOGIC ---
+    try {
+      final response = await authApi.register({
+        "firstName": _firstNameCtrl.text.trim(),
+        "lastName": _lastNameCtrl.text.trim(),
+        "email": _emailCtrl.text.trim(),
+        "password": _pwCtrl.text.trim(),
+      });
 
-    if (!mounted) return; // Added check from your code
-    // Set state to not busy
-    setState(() => _busy = false);
+      final token = response["token"];
+      await authApi.saveToken(token);
 
-    // (Optional) Show a success message or navigate
-    // On success, navigate (or show success UI)
-    context.go('/bundles');
+      if (!mounted) return;
+
+      setState(() => _busy = false);
+
+      // Navigate to home after successful registration
+      context.go("/bundles");
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => _busy = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(backgroundColor: Colors.red, content: Text(e.toString())),
+      );
+    }
   }
 
   // --- End of Mock Functions ---
@@ -97,7 +110,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 24.0,
+              vertical: 32.0,
+            ),
             child: Form(
               key: _formKey,
               child: Column(
@@ -111,7 +127,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     height: 120, // Adjust height as needed
                     fit: BoxFit.contain,
                   ),
-                  const SizedBox(height:12),
+                  const SizedBox(height: 12),
 
                   // Title
                   Text(
@@ -132,7 +148,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'First name required' : null,
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'First name required'
+                        : null,
                   ),
                   const SizedBox(height: 16),
 
@@ -145,7 +163,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Last name required' : null,
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'Last name required'
+                        : null,
                   ),
                   const SizedBox(height: 16),
 
@@ -174,7 +194,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
                         ),
                         onPressed: () {
                           setState(() {
@@ -198,7 +220,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                          _obscureConfirmPassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
                         ),
                         onPressed: () {
                           setState(() {
