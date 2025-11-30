@@ -39,12 +39,13 @@ class AuthApi {
       body: jsonEncode(req),
     );
 
+    final data = jsonDecode(res.body);
+
     if (res.statusCode != 200) {
-      throw Exception("Login failed");
-    } else {
-      final data = jsonDecode(res.body);
-      return data; // { "token": "..."}
+      throw Exception("Invalid credentials");
     }
+
+    return data; // { "token": "..."}
   }
 
   Future<Map<String, dynamic>> getMe() async {
