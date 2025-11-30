@@ -11,26 +11,42 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final AuthApi auth = AuthApi();
-  Map<String, dynamic>? user;
+
   bool loading = true;
+  bool isGuest = true; // <-- NEW
+  Map<String, dynamic>? user;
   String? error;
 
   @override
   void initState() {
     super.initState();
-    _loadMe();
+    _loadProfile();
   }
 
-  Future<void> _loadMe() async {
-    try {
-      final data = await auth.getMe(); // hit /auth/me
+  Future<void> _loadProfile() async {
+    final token = await auth.getToken();
+
+    if (token == null) {
+      // Guest mode
       setState(() {
+        isGuest = true;
+        loading = false;
+      });
+      return;
+    }
+
+    // Logged-in mode: try fetch /me
+    try {
+      final data = await auth.getMe();
+      setState(() {
+        isGuest = false;
         user = data;
         loading = false;
       });
     } catch (e) {
+      // Token invalid or backend error → treat as guest
       setState(() {
-        error = "Failed to load profile";
+        isGuest = true;
         loading = false;
       });
     }
@@ -61,27 +77,64 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (!mounted) return;
 
-      /// 🚀 CRITICAL FIX
       WidgetsBinding.instance.addPostFrameCallback((_) {
         context.go('/login');
       });
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
+  // -------------------------------------------------
+  //            UI FOR GUEST (NO ACCOUNT)
+  // -------------------------------------------------
+  Widget _buildGuestUI(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Profile")),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircleAvatar(
+                radius: 50,
+                backgroundImage: NetworkImage(
+                  'https://via.placeholder.com/150',
+                ),
+              ),
+              const SizedBox(height: 16),
 
-    if (error != null) {
-      return Scaffold(
-        body: Center(
-          child: Text(error!, style: const TextStyle(color: Colors.red)),
+              const Text(
+                "Guest User",
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+
+              const SizedBox(height: 6),
+              const Text(
+                "You are browsing as a guest.",
+                style: TextStyle(color: Colors.grey),
+              ),
+
+              const SizedBox(height: 24),
+
+              ElevatedButton.icon(
+                onPressed: () => context.go('/login'),
+                icon: const Icon(Icons.login),
+                label: const Text("Login to your Account"),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                ),
+              ),
+            ],
+          ),
         ),
-      );
-    }
+      ),
+    );
+  }
 
+  // -------------------------------------------------
+  //          UI FOR LOGGED-IN AUTH USER
+  // -------------------------------------------------
+  Widget _buildUserUI(BuildContext context) {
     final name = "${user!['firstName']} ${user!['lastName']}";
     final email = user!['email'];
 
@@ -97,14 +150,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 10),
 
-            /// 🔥 Name from backend
+            // Name
             Text(
               name,
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
 
-            /// 🔥 Email from backend
+            // Email
             Text(
               email,
               textAlign: TextAlign.center,
@@ -146,5 +199,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
+  }
+
+  // -------------------------------------------------
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    return isGuest ? _buildGuestUI(context) : _buildUserUI(context);
   }
 }

@@ -67,4 +67,9 @@ class AuthApi {
   Future<void> logout() async {
     await storage.delete(key: "token");
   }
+
+  Future<bool> isLoggedIn() async {
+    final token = await storage.read(key: "token");
+    return token != null;
+  }
 }
