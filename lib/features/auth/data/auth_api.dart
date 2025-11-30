@@ -63,4 +63,8 @@ class AuthApi {
 
     return jsonDecode(res.body);
   }
+
+  Future<void> logout() async {
+    await storage.delete(key: "token");
+  }
 }
