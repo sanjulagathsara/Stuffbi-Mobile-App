@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'providers/bundles_provider.dart';
-import 'add_edit_bundle_screen.dart';
+//import 'add_edit_bundle_screen.dart';
 
 class BundlesScreen extends StatefulWidget {
   const BundlesScreen({super.key});
@@ -37,7 +37,9 @@ class _BundlesScreenState extends State<BundlesScreen> {
             builder: (context, provider, child) {
               return IconButton(
                 icon: Icon(
-                  provider.showFavoritesOnly ? Icons.favorite : Icons.favorite_border,
+                  provider.showFavoritesOnly
+                      ? Icons.favorite
+                      : Icons.favorite_border,
                   color: provider.showFavoritesOnly ? Colors.red : Colors.black,
                   size: 28,
                 ),
@@ -48,7 +50,11 @@ class _BundlesScreenState extends State<BundlesScreen> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.add_circle_outline, color: Colors.black, size: 28),
+            icon: const Icon(
+              Icons.add_circle_outline,
+              color: Colors.black,
+              size: 28,
+            ),
             onPressed: () {
               context.push('/add_bundle');
             },
@@ -73,10 +79,16 @@ class _BundlesScreenState extends State<BundlesScreen> {
                       },
                       decoration: InputDecoration(
                         hintText: 'Search',
-                        prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                        prefixIcon: const Icon(
+                          Icons.search,
+                          color: Colors.grey,
+                        ),
                         suffixIcon: _searchController.text.isNotEmpty
                             ? IconButton(
-                                icon: const Icon(Icons.clear, color: Colors.grey),
+                                icon: const Icon(
+                                  Icons.clear,
+                                  color: Colors.grey,
+                                ),
                                 onPressed: () {
                                   _searchController.clear();
                                   provider.searchBundles('');
@@ -118,7 +130,10 @@ class _BundlesScreenState extends State<BundlesScreen> {
                               ),
                             ],
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(8),
@@ -130,7 +145,9 @@ class _BundlesScreenState extends State<BundlesScreen> {
                                   const Icon(Icons.sort, color: Colors.black),
                                   const SizedBox(width: 8),
                                   Text(
-                                    provider.sortOrder == 'asc' ? 'Name (A-Z)' : 'Recent',
+                                    provider.sortOrder == 'asc'
+                                        ? 'Name (A-Z)'
+                                        : 'Recent',
                                     style: const TextStyle(color: Colors.black),
                                   ),
                                 ],
@@ -154,7 +171,7 @@ class _BundlesScreenState extends State<BundlesScreen> {
                 if (bundlesProvider.isLoading) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                
+
                 if (bundlesProvider.bundles.isEmpty) {
                   return const Center(child: Text('No bundles found.'));
                 }
@@ -172,16 +189,18 @@ class _BundlesScreenState extends State<BundlesScreen> {
                     final bundle = bundlesProvider.bundles[index];
                     return GestureDetector(
                       onTap: () {
-                         context.push('/bundle_details', extra: bundle);
+                        context.push('/bundle_details', extra: bundle);
                       },
                       onLongPress: () {
                         showDialog(
                           context: context,
                           builder: (context) => AlertDialog(
                             title: const Text('Bundle Options'),
-                            content: Text(bundle.isFavorite
-                                ? 'Remove from favorites?'
-                                : 'Add to favorites?'),
+                            content: Text(
+                              bundle.isFavorite
+                                  ? 'Remove from favorites?'
+                                  : 'Add to favorites?',
+                            ),
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.pop(context),
@@ -192,7 +211,9 @@ class _BundlesScreenState extends State<BundlesScreen> {
                                   bundlesProvider.toggleFavorite(bundle.id);
                                   Navigator.pop(context);
                                 },
-                                child: Text(bundle.isFavorite ? 'Remove' : 'Add'),
+                                child: Text(
+                                  bundle.isFavorite ? 'Remove' : 'Add',
+                                ),
                               ),
                             ],
                           ),
@@ -266,7 +287,10 @@ class BundleCard extends StatelessWidget {
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) {
                               return const Center(
-                                child: Icon(Icons.broken_image, color: Colors.blue),
+                                child: Icon(
+                                  Icons.broken_image,
+                                  color: Colors.blue,
+                                ),
                               );
                             },
                           ),
@@ -283,11 +307,7 @@ class BundleCard extends StatelessWidget {
                   const Positioned(
                     top: 4,
                     right: 4,
-                    child: Icon(
-                      Icons.favorite,
-                      color: Colors.red,
-                      size: 30,
-                    ),
+                    child: Icon(Icons.favorite, color: Colors.red, size: 30),
                   ),
               ],
             ),
@@ -307,10 +327,7 @@ class BundleCard extends StatelessWidget {
               subtitle,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
             ),
             const Spacer(),
             Align(

@@ -82,7 +82,7 @@ class _Logo extends StatelessWidget {
     return Image.asset(
       'assets/images/logo_stuffbi.png',
       fit: BoxFit.contain,
-      errorBuilder: (_, __, ___) => Container(
+      errorBuilder: (_, _, _) => Container(
         decoration: BoxDecoration(
           color: cs.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(24),

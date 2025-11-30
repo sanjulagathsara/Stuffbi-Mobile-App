@@ -53,7 +53,7 @@ class UnderDevelopment extends StatelessWidget {
                       imageAsset,
                       fit: BoxFit.contain,
                       // fallback to icon if asset missing
-                      errorBuilder: (_, __, ___) => Icon(
+                      errorBuilder: (_, _, _) => Icon(
                         Icons.construction,
                         size: imageSize,
                         color: cs.primary,

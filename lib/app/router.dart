@@ -15,18 +15,19 @@ import '../features/bundles/presentation/add_edit_bundle_screen.dart';
 final GoRouter appRouter = GoRouter(
   initialLocation: '/splash',
   routes: [
-    GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
-    GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+    GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),
+    GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
     GoRoute(
-        path: '/under_development',
-        builder: (_, __) => const UnderDevelopmentScreen()),
-    GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
+      path: '/under_development',
+      builder: (_, _) => const UnderDevelopmentScreen(),
+    ),
+    GoRoute(path: '/register', builder: (_, _) => const RegisterScreen()),
     ShellRoute(
       builder: (context, state, child) {
         return AppShell(child: child);
       },
       routes: [
-        GoRoute(path: '/bundles', builder: (_, __) => const BundlesScreen()),
+        GoRoute(path: '/bundles', builder: (_, _) => const BundlesScreen()),
         GoRoute(
           path: '/bundle_details',
           builder: (context, state) {
@@ -41,8 +42,8 @@ final GoRouter appRouter = GoRouter(
             return AddEditBundleScreen(bundle: bundle);
           },
         ),
-        GoRoute(path: '/items', builder: (_, __) => const ItemsScreen()),
-        GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
+        GoRoute(path: '/items', builder: (_, _) => const ItemsScreen()),
+        GoRoute(path: '/profile', builder: (_, _) => const ProfileScreen()),
       ],
     ),
   ],

@@ -167,7 +167,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _selectedCategory,
+                initialValue: _selectedCategory,
                 decoration: const InputDecoration(
                   labelText: 'Category',
                   border: OutlineInputBorder(),
@@ -189,7 +189,7 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
                 builder: (context, bundlesProvider, child) {
                   final bundles = bundlesProvider.bundles;
                   return DropdownButtonFormField<String>(
-                    value: _selectedBundleId,
+                    initialValue: _selectedBundleId,
                     decoration: const InputDecoration(
                       labelText: 'Current Bundle',
                       border: OutlineInputBorder(),
