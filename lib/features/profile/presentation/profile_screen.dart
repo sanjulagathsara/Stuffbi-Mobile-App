@@ -97,9 +97,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               const CircleAvatar(
                 radius: 50,
-                backgroundImage: NetworkImage(
-                  'https://via.placeholder.com/150',
-                ),
+                backgroundImage: AssetImage('assets/images/default-avatar.png'),
               ),
               const SizedBox(height: 16),
 
@@ -146,7 +144,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 20),
             const CircleAvatar(
               radius: 50,
-              backgroundImage: NetworkImage('https://via.placeholder.com/150'),
+              backgroundImage: AssetImage('assets/images/default-avatar.png'),
             ),
             const SizedBox(height: 10),
 
