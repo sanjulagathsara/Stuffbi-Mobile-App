@@ -53,7 +53,13 @@ class _ItemsScreenState extends State<ItemsScreen> {
                   )
                 : null,
             actions: [
-              if (provider.isSelectionMode)
+              if (provider.isSelectionMode) ...[
+                IconButton(
+                  icon: const Icon(Icons.drive_file_move_outline, color: Colors.blue, size: 28),
+                  onPressed: () {
+                    _showBundleSelectionDialog(context, provider, bundlesProvider);
+                  },
+                ),
                 IconButton(
                   icon: const Icon(Icons.delete, color: Colors.red, size: 28),
                   onPressed: () async {
@@ -79,8 +85,8 @@ class _ItemsScreenState extends State<ItemsScreen> {
                       provider.deleteSelectedItems();
                     }
                   },
-                )
-              else
+                ),
+              ] else
                 IconButton(
                   icon: const Icon(Icons.add_circle_outline, color: Colors.black, size: 28),
                   onPressed: () {
@@ -284,6 +290,184 @@ class _ItemsScreenState extends State<ItemsScreen> {
           ),
         );
       },
+    );
+  }
+
+  void _showBundleSelectionDialog(
+      BuildContext context, ItemsProvider itemsProvider, BundlesProvider bundlesProvider) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.5,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return _BundleSelectionSheet(
+              itemsProvider: itemsProvider,
+              bundlesProvider: bundlesProvider,
+              scrollController: scrollController,
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _BundleSelectionSheet extends StatefulWidget {
+  final ItemsProvider itemsProvider;
+  final BundlesProvider bundlesProvider;
+  final ScrollController scrollController;
+
+  const _BundleSelectionSheet({
+    required this.itemsProvider,
+    required this.bundlesProvider,
+    required this.scrollController,
+  });
+
+  @override
+  State<_BundleSelectionSheet> createState() => _BundleSelectionSheetState();
+}
+
+class _BundleSelectionSheetState extends State<_BundleSelectionSheet> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Access bundles directly from the provider. 
+    // Note: We are not listening to changes here because we passed the provider instance.
+    // If bundles change while this is open, it might not update unless we use Consumer or context.watch.
+    // However, for this use case, it's likely fine.
+    final allBundles = widget.bundlesProvider.bundles;
+    final showSearch = allBundles.length > 5;
+
+    final filteredBundles = _searchQuery.isEmpty
+        ? allBundles
+        : allBundles.where((bundle) {
+            return bundle.name.toLowerCase().contains(_searchQuery.toLowerCase());
+          }).toList();
+
+    return Column(
+      children: [
+        const SizedBox(height: 12),
+        Container(
+          width: 40,
+          height: 4,
+          decoration: BoxDecoration(
+            color: Colors.grey[300],
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Assign to Bundle',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (showSearch)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+              decoration: InputDecoration(
+                hintText: 'Search bundles...',
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.grey[100],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+              ),
+            ),
+          ),
+        Expanded(
+          child: filteredBundles.isEmpty
+              ? const Center(child: Text('No bundles found'))
+              : ListView.separated(
+                  controller: widget.scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  itemCount: filteredBundles.length,
+                  separatorBuilder: (context, index) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final bundle = filteredBundles[index];
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(8),
+                          image: bundle.imagePath != null
+                              ? DecorationImage(
+                                  image: FileImage(File(bundle.imagePath!)),
+                                  fit: BoxFit.cover,
+                                )
+                              : null,
+                        ),
+                        child: bundle.imagePath == null
+                            ? const Icon(Icons.inventory_2_outlined, color: Colors.grey)
+                            : null,
+                      ),
+                      title: Text(
+                        bundle.name,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        '${widget.itemsProvider.items.where((i) => i.bundleId == bundle.id).length} items',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      ),
+                      onTap: () async {
+                        // Perform assignment
+                        final selectedIds = widget.itemsProvider.selectedItemIds.toList();
+                        
+                        // 1. Update Bundle (Repo + Provider)
+                        await widget.bundlesProvider.moveItemsToBundle(bundle.id, selectedIds);
+                        
+                        // 2. Update Items (Local Provider State)
+                        widget.itemsProvider.moveItemsLocal(selectedIds, bundle.id);
+                        
+                        // 3. Exit selection mode
+                        widget.itemsProvider.toggleSelectionMode();
+                        
+                        // 4. Close dialog
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Moved ${selectedIds.length} items to ${bundle.name}'),
+                            ),
+                          );
+                        }
+                      },
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 }
