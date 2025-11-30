@@ -1,5 +1,4 @@
 import 'package:sqflite/sqflite.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
@@ -75,14 +74,18 @@ class DatabaseHelper {
       // Check if column exists before adding to avoid errors if re-running
       // But for simple migration we can just try-catch or assume it's needed
       try {
-        await db.execute('ALTER TABLE bundles ADD COLUMN is_favorite INTEGER DEFAULT 0');
+        await db.execute(
+          'ALTER TABLE bundles ADD COLUMN is_favorite INTEGER DEFAULT 0',
+        );
       } catch (e) {
         debugPrint('Error adding is_favorite column: $e');
       }
     }
     if (oldVersion < 4) {
       try {
-        await db.execute('ALTER TABLE items ADD COLUMN is_checked INTEGER DEFAULT 0');
+        await db.execute(
+          'ALTER TABLE items ADD COLUMN is_checked INTEGER DEFAULT 0',
+        );
       } catch (e) {
         debugPrint('Error adding is_checked column: $e');
       }
