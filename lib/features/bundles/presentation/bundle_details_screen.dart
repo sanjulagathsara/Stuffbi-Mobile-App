@@ -19,6 +19,8 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
   bool _isDragMode = false;
   bool _isDraggingItem = false;
   final Set<String> _selectedItemIds = {};
+  String _searchQuery = '';
+  bool _isSearchingToAdd = false;
 
   Future<void> _removeSelectedItems() async {
     final confirm = await showDialog<bool>(
@@ -187,6 +189,141 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
     }
   }
 
+  Future<void> _showAddItemSheet() async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) {
+        final Set<String> itemsToAdd = {};
+        return DraggableScrollableSheet(
+          initialChildSize: 0.9,
+          minChildSize: 0.5,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return StatefulBuilder(
+              builder: (context, setSheetState) {
+                return Consumer<ItemsProvider>(
+                  builder: (context, itemsProvider, child) {
+                    final availableItems = itemsProvider.items
+                        .where((item) => item.bundleId != widget.bundle.id)
+                        .toList();
+                    
+                    final filteredAvailable = _isSearchingToAdd && _searchQuery.isNotEmpty
+                        ? availableItems.where((item) => 
+                            item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                            item.category.toLowerCase().contains(_searchQuery.toLowerCase())
+                          ).toList()
+                        : availableItems;
+
+                    return Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Row(
+                            children: [
+                              const Text('Add Items to Bundle', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                              const Spacer(),
+                              IconButton(
+                                icon: const Icon(Icons.close),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: TextField(
+                            decoration: InputDecoration(
+                              hintText: 'Search items to add...',
+                              prefixIcon: const Icon(Icons.search),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                            ),
+                            onChanged: (val) {
+                              setSheetState(() {
+                                _searchQuery = val;
+                                _isSearchingToAdd = true;
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Expanded(
+                          child: filteredAvailable.isEmpty
+                              ? const Center(child: Text('No items available to add'))
+                              : ListView.builder(
+                                  controller: scrollController,
+                                  itemCount: filteredAvailable.length,
+                                  itemBuilder: (context, index) {
+                                    final item = filteredAvailable[index];
+                                    final isSelected = itemsToAdd.contains(item.id);
+                                    return CheckboxListTile(
+                                      title: Text(item.name),
+                                      subtitle: Text(item.category),
+                                      secondary: item.imagePath != null
+                                          ? ClipRRect(
+                                              borderRadius: BorderRadius.circular(4),
+                                              child: Image.file(File(item.imagePath!), width: 40, height: 40, fit: BoxFit.cover),
+                                            )
+                                          : const Icon(Icons.image),
+                                      value: isSelected,
+                                      onChanged: (bool? value) {
+                                        setSheetState(() {
+                                          if (value == true) {
+                                            itemsToAdd.add(item.id);
+                                          } else {
+                                            itemsToAdd.remove(item.id);
+                                          }
+                                        });
+                                      },
+                                    );
+                                  },
+                                ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(50),
+                              backgroundColor: Theme.of(context).primaryColor,
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: itemsToAdd.isEmpty
+                                ? null
+                                : () async {
+                                    Navigator.pop(context);
+                                    await Provider.of<BundlesProvider>(context, listen: false)
+                                        .moveItemsToBundle(widget.bundle.id, itemsToAdd.toList());
+                                    
+                                    if (mounted) {
+                                      await Provider.of<ItemsProvider>(context, listen: false).loadItems();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Added ${itemsToAdd.length} items to bundle')),
+                                      );
+                                    }
+                                  },
+                            child: Text('Add ${itemsToAdd.length} Items'),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            );
+          },
+        );
+      },
+    ).then((_) {
+      setState(() {
+        _searchQuery = '';
+        _isSearchingToAdd = false;
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<BundlesProvider>(
@@ -225,6 +362,12 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
           appBar: AppBar(
             title: Text(bundle.name),
             actions: [
+              if (_selectedItemIds.isEmpty)
+                 IconButton(
+                  icon: const Icon(Icons.add_circle_outline),
+                  tooltip: 'Add Items',
+                  onPressed: _showAddItemSheet,
+                ),
               if (_selectedItemIds.isNotEmpty)
                 IconButton(
                   icon: const Icon(Icons.clear),
@@ -375,35 +518,70 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
                     ),
                   ),
 
-                  // Items List
-                  Expanded(
-                    child: Consumer<ItemsProvider>(
-                      builder: (context, itemsProvider, child) {
-                        final bundleItems = itemsProvider.items
-                            .where((item) => item.bundleId == bundle.id)
-                            .toList();
+              // Items List
+              Expanded(
+                child: Consumer<ItemsProvider>(
+                  builder: (context, itemsProvider, child) {
+                    final allBundleItems = itemsProvider.items
+                        .where((item) => item.bundleId == bundle.id)
+                        .toList();
+                    
+                    final displayItems = _searchQuery.isNotEmpty && !_isSearchingToAdd
+                        ? allBundleItems.where((item) => 
+                            item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                            item.category.toLowerCase().contains(_searchQuery.toLowerCase())
+                          ).toList()
+                        : allBundleItems;
 
-                        if (bundleItems.isEmpty) {
-                          return const Center(
-                            child: Text('No items in this bundle'),
-                          );
-                        }
+                    if (allBundleItems.isEmpty) {
+                      return const Center(child: Text('No items in this bundle'));
+                    }
 
-                        return GridView.builder(
-                          padding: const EdgeInsets.all(16),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                crossAxisSpacing: 16,
-                                mainAxisSpacing: 16,
-                                childAspectRatio: 0.8,
+                    return Column(
+                      children: [
+                        if (allBundleItems.length > 4)
+                          Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: TextField(
+                              decoration: InputDecoration(
+                                hintText: 'Search in bundle...',
+                                prefixIcon: const Icon(Icons.search),
+                                suffixIcon: _searchQuery.isNotEmpty 
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear),
+                                      onPressed: () {
+                                        setState(() {
+                                          _searchQuery = '';
+                                        });
+                                      },
+                                    ) 
+                                  : null,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                               ),
-                          itemCount: bundleItems.length,
-                          itemBuilder: (context, index) {
-                            final item = bundleItems[index];
-                            final isSelected = _selectedItemIds.contains(
-                              item.id,
-                            );
+                              onChanged: (val) {
+                                setState(() {
+                                  _searchQuery = val;
+                                  _isSearchingToAdd = false;
+                                });
+                              },
+                            ),
+                          ),
+                        Expanded(
+                          child: GridView.builder(
+                            padding: const EdgeInsets.all(16),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                              childAspectRatio: 0.8,
+                            ),
+                            itemCount: displayItems.length,
+                            itemBuilder: (context, index) {
+                              final item = displayItems[index];
+                        final isSelected = _selectedItemIds.contains(item.id);
 
                             return GestureDetector(
                               onTap: () {
@@ -511,6 +689,9 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
                               ),
                             );
                           },
+                          ),
+                        ),
+                      ],
                         );
                       },
                     ),
@@ -572,114 +753,80 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
                                         itemsToMove = _selectedItemIds.toList();
                                       }
 
-                                      await Provider.of<BundlesProvider>(
-                                        context,
-                                        listen: false,
-                                      ).moveItemsToBundle(
-                                        targetBundle.id,
-                                        itemsToMove,
-                                      );
+                                  // Optimistic Update
+                                  Provider.of<ItemsProvider>(context, listen: false)
+                                      .moveItemsLocal(itemsToMove, targetBundle.id);
 
-                                      if (mounted) {
-                                        await Provider.of<ItemsProvider>(
-                                          context,
-                                          listen: false,
-                                        ).loadItems();
+                                  // Clear selection immediately
+                                  if (_selectedItemIds.contains(itemId)) {
+                                    setState(() {
+                                      _selectedItemIds.clear();
+                                      _isDragMode = false;
+                                    });
+                                  }
 
-                                        // Clear selection if we moved selected items
-                                        if (_selectedItemIds.contains(itemId)) {
-                                          setState(() {
-                                            _selectedItemIds.clear();
-                                            _isDragMode = false;
-                                          });
-                                        }
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Moved ${itemsToMove.length} items to ${targetBundle.name}')),
+                                  );
 
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              'Moved ${itemsToMove.length} items to ${targetBundle.name}',
+                                  // Persist in background
+                                  await Provider.of<BundlesProvider>(context, listen: false)
+                                      .moveItemsToBundle(targetBundle.id, itemsToMove);
+                                  
+                                  if (mounted) {
+                                    // Ensure consistency (optional, but good practice)
+                                    await Provider.of<ItemsProvider>(context, listen: false).loadItems();
+                                  }
+                                },
+                                builder: (context, candidateData, rejectedData) {
+                                  final isHovered = candidateData.isNotEmpty;
+                                  return Container(
+                                    width: 100,
+                                    decoration: BoxDecoration(
+                                      color: isHovered ? Colors.blue.withOpacity(0.5) : Colors.grey[800],
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: isHovered ? Border.all(color: Colors.blue, width: 2) : null,
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        if (targetBundle.imagePath != null)
+                                          ClipRRect(
+                                            borderRadius: BorderRadius.circular(8),
+                                            child: Image.file(
+                                              File(targetBundle.imagePath!),
+                                              width: 40,
+                                              height: 40,
+                                              fit: BoxFit.cover,
                                             ),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                    builder:
-                                        (context, candidateData, rejectedData) {
-                                          final isHovered =
-                                              candidateData.isNotEmpty;
-                                          return Container(
-                                            width: 100,
-                                            decoration: BoxDecoration(
-                                              color: isHovered
-                                                  ? Colors.blue.withValues(
-                                                      alpha: 0.5,
-                                                    )
-                                                  : Colors.grey[800],
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                              border: isHovered
-                                                  ? Border.all(
-                                                      color: Colors.blue,
-                                                      width: 2,
-                                                    )
-                                                  : null,
-                                            ),
-                                            child: Column(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                if (targetBundle.imagePath !=
-                                                    null)
-                                                  ClipRRect(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          8,
-                                                        ),
-                                                    child: Image.file(
-                                                      File(
-                                                        targetBundle.imagePath!,
-                                                      ),
-                                                      width: 40,
-                                                      height: 40,
-                                                      fit: BoxFit.cover,
-                                                    ),
-                                                  )
-                                                else
-                                                  const Icon(
-                                                    Icons.folder,
-                                                    color: Colors.white,
-                                                  ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  targetBundle.name,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 12,
-                                                  ),
-                                                  textAlign: TextAlign.center,
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        },
+                                          )
+                                        else
+                                          const Icon(Icons.folder, color: Colors.white),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          targetBundle.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ],
+                                    ),
                                   );
                                 },
                               );
                             },
-                          ),
-                        ),
-                      ],
+                          );
+                        },
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-            ],
-          ),
-        );
+              ),
+            ),
+        ],
+      ),
+    );
       },
     );
   }

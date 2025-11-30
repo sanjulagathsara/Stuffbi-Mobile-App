@@ -136,4 +136,15 @@ class ItemsProvider extends ChangeNotifier {
     _applySearch();
     notifyListeners();
   }
+
+  void moveItemsLocal(List<String> itemIds, String targetBundleId) {
+    for (var id in itemIds) {
+      final index = _items.indexWhere((item) => item.id == id);
+      if (index != -1) {
+        _items[index] = _items[index].copyWith(bundleId: targetBundleId);
+      }
+    }
+    _applySearch();
+    notifyListeners();
+  }
 }
