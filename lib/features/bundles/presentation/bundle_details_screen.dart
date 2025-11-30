@@ -480,23 +480,29 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
                                     itemsToMove = _selectedItemIds.toList();
                                   }
 
+                                  // Optimistic Update
+                                  Provider.of<ItemsProvider>(context, listen: false)
+                                      .moveItemsLocal(itemsToMove, targetBundle.id);
+
+                                  // Clear selection immediately
+                                  if (_selectedItemIds.contains(itemId)) {
+                                    setState(() {
+                                      _selectedItemIds.clear();
+                                      _isDragMode = false;
+                                    });
+                                  }
+
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Moved ${itemsToMove.length} items to ${targetBundle.name}')),
+                                  );
+
+                                  // Persist in background
                                   await Provider.of<BundlesProvider>(context, listen: false)
                                       .moveItemsToBundle(targetBundle.id, itemsToMove);
                                   
                                   if (mounted) {
+                                    // Ensure consistency (optional, but good practice)
                                     await Provider.of<ItemsProvider>(context, listen: false).loadItems();
-                                    
-                                    // Clear selection if we moved selected items
-                                    if (_selectedItemIds.contains(itemId)) {
-                                      setState(() {
-                                        _selectedItemIds.clear();
-                                        _isDragMode = false;
-                                      });
-                                    }
-
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Moved ${itemsToMove.length} items to ${targetBundle.name}')),
-                                    );
                                   }
                                 },
                                 builder: (context, candidateData, rejectedData) {
