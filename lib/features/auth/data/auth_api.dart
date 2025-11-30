@@ -39,13 +39,12 @@ class AuthApi {
       body: jsonEncode(req),
     );
 
-    final data = jsonDecode(res.body);
-
     if (res.statusCode != 200) {
-      throw Exception(data["message"] ?? "Login failed");
+      throw Exception("Login failed");
+    } else {
+      final data = jsonDecode(res.body);
+      return data; // { "token": "..."}
     }
-
-    return data; // { "token": "..."}
   }
 
   Future<Map<String, dynamic>> getMe() async {
