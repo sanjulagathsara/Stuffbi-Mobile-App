@@ -11,6 +11,7 @@ import '../features/profile/presentation/profile_screen.dart';
 import '../features/bundles/presentation/bundle_details_screen.dart';
 import '../features/bundles/models/bundle_model.dart';
 import '../features/bundles/presentation/add_edit_bundle_screen.dart';
+import '../features/activity/presentation/activity_screen.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/splash',
@@ -43,6 +44,7 @@ final GoRouter appRouter = GoRouter(
           },
         ),
         GoRoute(path: '/items', builder: (_, _) => const ItemsScreen()),
+        GoRoute(path: '/activity', builder: (_, _) => const ActivityScreen()),
         GoRoute(path: '/profile', builder: (_, _) => const ProfileScreen()),
       ],
     ),

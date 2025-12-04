@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../data/items_repository_impl.dart';
 import '../../models/item_model.dart';
+import '../../../activity/data/activity_repository.dart';
+import '../../../activity/models/activity_log_model.dart';
 
 class ItemsProvider extends ChangeNotifier {
   final ItemsRepositoryImpl _repository = ItemsRepositoryImpl();
+  final ActivityRepository _activityRepository = ActivityRepository();
   List<Item> _items = [];
   List<Item> _filteredItems = [];
   bool _isLoading = false;
@@ -41,6 +44,20 @@ class ItemsProvider extends ChangeNotifier {
       bundleId: bundleId,
     );
     await _repository.addItem(newItem);
+    
+    // Log creation
+    try {
+      await _activityRepository.logActivity(ActivityLog(
+        id: const Uuid().v4(),
+        itemId: newItem.id,
+        actionType: 'create',
+        timestamp: DateTime.now(),
+        details: 'Created item: ${newItem.name}',
+      ));
+    } catch (e) {
+      debugPrint('Error logging creation: $e');
+    }
+
     await loadItems();
   }
 
@@ -50,12 +67,42 @@ class ItemsProvider extends ChangeNotifier {
   }
 
   Future<void> deleteItem(String id) async {
+    final item = _items.firstWhere((i) => i.id == id, orElse: () => Item(id: '', name: 'Unknown', category: '', details: ''));
     await _repository.deleteItem(id);
+    
+    if (item.id.isNotEmpty) {
+      try {
+        await _activityRepository.logActivity(ActivityLog(
+          id: const Uuid().v4(),
+          itemId: id,
+          actionType: 'delete',
+          timestamp: DateTime.now(),
+          details: 'Deleted item: ${item.name}',
+        ));
+      } catch (e) {
+        debugPrint('Error logging deletion: $e');
+      }
+    }
+
     await loadItems();
   }
 
   Future<void> deleteSelectedItems() async {
     await _repository.deleteItems(_selectedItemIds.toList());
+    
+    // Log bulk deletion
+    try {
+      await _activityRepository.logActivity(ActivityLog(
+        id: const Uuid().v4(),
+        itemId: 'multiple',
+        actionType: 'delete',
+        timestamp: DateTime.now(),
+        details: 'Deleted ${_selectedItemIds.length} items',
+      ));
+    } catch (e) {
+      debugPrint('Error logging bulk deletion: $e');
+    }
+
     _selectedItemIds.clear();
     _isSelectionMode = false;
     await loadItems();
@@ -115,6 +162,20 @@ class ItemsProvider extends ChangeNotifier {
       notifyListeners();
 
       await _repository.updateItem(updatedItem);
+
+      if (isChecking) {
+        try {
+          await _activityRepository.logActivity(ActivityLog(
+            id: const Uuid().v4(),
+            itemId: itemId,
+            actionType: 'check',
+            timestamp: DateTime.now(),
+            details: 'Checked item: ${item.name}',
+          ));
+        } catch (e) {
+          debugPrint('Error logging check: $e');
+        }
+      }
     }
   }
 

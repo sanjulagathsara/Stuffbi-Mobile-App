@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../data/bundles_repository_impl.dart';
 import '../../models/bundle_model.dart';
+import '../../../activity/data/activity_repository.dart';
+import '../../../activity/models/activity_log_model.dart';
 
 class BundlesProvider extends ChangeNotifier {
   final BundlesRepositoryImpl _repository = BundlesRepositoryImpl();
+  final ActivityRepository _activityRepository = ActivityRepository();
   List<Bundle> _bundles = [];
   List<Bundle> _filteredBundles = [];
   bool _isLoading = false;
@@ -39,8 +42,35 @@ class BundlesProvider extends ChangeNotifier {
       imagePath: imagePath,
     );
     await _repository.addBundle(newBundle);
+    
+    // Log bundle creation
+    try {
+      await _activityRepository.logActivity(ActivityLog(
+        id: const Uuid().v4(),
+        itemId: newBundle.id,
+        actionType: 'create_bundle',
+        timestamp: DateTime.now(),
+        details: 'Created bundle: $name',
+      ));
+    } catch (e) {
+      debugPrint('Error logging bundle creation: $e');
+    }
+
     if (selectedItemIds.isNotEmpty) {
       await _repository.addItemsToBundle(newBundle.id, selectedItemIds);
+      
+      // Log items added to new bundle
+      try {
+        await _activityRepository.logActivity(ActivityLog(
+          id: const Uuid().v4(),
+          itemId: 'multiple',
+          actionType: 'move',
+          timestamp: DateTime.now(),
+          details: 'Moved ${selectedItemIds.length} item(s) to new bundle: $name',
+        ));
+      } catch (e) {
+        debugPrint('Error logging new bundle items: $e');
+      }
     }
     await loadBundles();
   }
@@ -51,16 +81,58 @@ class BundlesProvider extends ChangeNotifier {
   }
 
   Future<void> deleteBundle(String id) async {
+    final bundle = _bundles.firstWhere((b) => b.id == id, orElse: () => Bundle(id: '', name: 'Unknown', description: ''));
     await _repository.deleteBundle(id);
+    
+    // Log bundle deletion
+    try {
+      await _activityRepository.logActivity(ActivityLog(
+        id: const Uuid().v4(),
+        itemId: id,
+        actionType: 'delete_bundle',
+        timestamp: DateTime.now(),
+        details: 'Deleted bundle: ${bundle.name}',
+      ));
+    } catch (e) {
+      debugPrint('Error logging bundle deletion: $e');
+    }
+
     await loadBundles();
   }
 
   Future<void> moveItemsToBundle(String targetBundleId, List<String> itemIds) async {
     await _repository.addItemsToBundle(targetBundleId, itemIds);
+    
+    // Find bundle name for log
+    try {
+      final bundle = _bundles.firstWhere((b) => b.id == targetBundleId, orElse: () => Bundle(id: '', name: 'Unknown', description: ''));
+      
+      await _activityRepository.logActivity(ActivityLog(
+        id: const Uuid().v4(),
+        itemId: 'multiple',
+        actionType: 'move',
+        timestamp: DateTime.now(),
+        details: 'Moved ${itemIds.length} item(s) to ${bundle.name}',
+      ));
+    } catch (e) {
+      debugPrint('Error logging move items: $e');
+    }
   }
 
   Future<void> removeItemsFromBundle(List<String> itemIds) async {
     await _repository.removeItemsFromBundle(itemIds);
+    
+    try {
+      await _activityRepository.logActivity(ActivityLog(
+        id: const Uuid().v4(),
+        itemId: 'multiple',
+        actionType: 'move',
+        timestamp: DateTime.now(),
+        details: 'Removed ${itemIds.length} item(s) from bundle',
+      ));
+    } catch (e) {
+      debugPrint('Error logging remove items: $e');
+    }
   }
 
   Future<void> toggleFavorite(String bundleId) async {
@@ -115,16 +187,6 @@ class BundlesProvider extends ChangeNotifier {
     if (_sortOrder == 'asc') {
       result.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     } else if (_sortOrder == 'recent') {
-      // For "recently accessed", we ideally need a last_accessed or last_updated timestamp.
-      // Since we don't have that yet, we can't strictly implement it without schema change.
-      // This would require a complex query joining items and grouping by bundle.
-      // For now, let's reverse the list as a proxy for "newest created" if IDs are time-ordered (UUID v4 is random though).
-      // Or we can just leave it as is or implement a simple name desc.
-      // Let's assume the user wants to see the bundles they interacted with.
-      // Without a timestamp, we can't do this accurately.
-      // Let's stick to name sort for now or maybe reverse name?
-      // Actually, let's just reverse the list to show "newest first" if the DB returns insertion order (rowid).
-      // SQLite usually returns in insertion order by default.
       result = result.reversed.toList();
     }
 

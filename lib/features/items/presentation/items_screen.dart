@@ -458,7 +458,7 @@ class _BundleSelectionSheetState extends State<_BundleSelectionSheet> {
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Moved ${selectedIds.length} items to ${bundle.name}'),
+                              content: Text('Moved ${selectedIds.length} item(s) to ${bundle.name}'),
                             ),
                           );
                         }

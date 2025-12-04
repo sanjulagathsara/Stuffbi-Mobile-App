@@ -23,7 +23,16 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   String? _selectedBundleId;
   String? _imagePath;
 
-  final List<String> _categories = ['Electronics', 'Clothing', 'Books', 'Furniture', 'University', 'Other'];
+final List<String> _categories = [
+  'Electronics',
+  'Clothing & Accessories',
+  'Books & Stationery',
+  'Home Items',
+  'University / Work Supplies',
+  'Personal Care & Hygiene',
+  'Food & Groceries',
+  'Other'
+];
 
   @override
   void initState() {

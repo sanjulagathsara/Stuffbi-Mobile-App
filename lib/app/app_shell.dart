@@ -28,6 +28,11 @@ class AppShell extends StatelessWidget {
             label: 'Items',
           ),
           BottomNavigationBarItem(
+            icon: Icon(Icons.show_chart),
+            activeIcon: Icon(Icons.show_chart, color: Colors.blue),
+            label: 'Activity',
+          ),
+          BottomNavigationBarItem(
             icon: Image.asset('assets/icons/profile.png', width: 24, height: 24),
             activeIcon: Image.asset('assets/icons/profile.png', width: 24, height: 24, color: Colors.blue),
             label: 'Profile',
@@ -45,8 +50,11 @@ class AppShell extends StatelessWidget {
     if (location.startsWith('/items')) {
       return 1;
     }
-    if (location.startsWith('/profile')) {
+    if (location.startsWith('/activity')) {
       return 2;
+    }
+    if (location.startsWith('/profile')) {
+      return 3;
     }
     return 0;
   }
@@ -60,6 +68,9 @@ class AppShell extends StatelessWidget {
         GoRouter.of(context).go('/items');
         break;
       case 2:
+        GoRouter.of(context).go('/activity');
+        break;
+      case 3:
         GoRouter.of(context).go('/profile');
         break;
     }

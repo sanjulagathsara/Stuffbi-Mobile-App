@@ -26,7 +26,7 @@ class DatabaseHelper {
     debugPrint('Database path: $path'); // Print path for debugging
     return await openDatabase(
       path,
-      version: 5,
+      version: 6,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -56,6 +56,15 @@ class DatabaseHelper {
         is_favorite INTEGER DEFAULT 0
       )
     ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS activity_logs(
+        id TEXT PRIMARY KEY,
+        item_id TEXT,
+        action_type TEXT,
+        timestamp TEXT,
+        details TEXT
+      )
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -71,8 +80,6 @@ class DatabaseHelper {
       ''');
     }
     if (oldVersion < 3) {
-      // Check if column exists before adding to avoid errors if re-running
-      // But for simple migration we can just try-catch or assume it's needed
       try {
         await db.execute(
           'ALTER TABLE bundles ADD COLUMN is_favorite INTEGER DEFAULT 0',
@@ -96,6 +103,17 @@ class DatabaseHelper {
       } catch (e) {
         debugPrint('Error adding last_checked_at column: $e');
       }
+    }
+    if (oldVersion < 6) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS activity_logs(
+          id TEXT PRIMARY KEY,
+          item_id TEXT,
+          action_type TEXT,
+          timestamp TEXT,
+          details TEXT
+        )
+      ''');
     }
   }
 }
