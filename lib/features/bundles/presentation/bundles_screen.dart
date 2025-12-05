@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'providers/bundles_provider.dart';
+import '../../items/presentation/controllers/items_provider.dart';
 //import 'add_edit_bundle_screen.dart';
 
 class BundlesScreen extends StatefulWidget {
@@ -122,7 +123,7 @@ class _BundlesScreenState extends State<BundlesScreen> {
                             itemBuilder: (context) => [
                               const PopupMenuItem(
                                 value: 'asc',
-                                child: Text('Name (A-Z)'),
+                                child: Text('Sort by Name (A-Z)'),
                               ),
                               const PopupMenuItem(
                                 value: 'recent',
@@ -147,7 +148,7 @@ class _BundlesScreenState extends State<BundlesScreen> {
                                   Text(
                                     provider.sortOrder == 'asc'
                                         ? 'Name (A-Z)'
-                                        : 'Recent',
+                                        : 'Recently added',
                                     style: const TextStyle(color: Colors.black),
                                   ),
                                 ],
@@ -166,8 +167,8 @@ class _BundlesScreenState extends State<BundlesScreen> {
 
           // Bundles Grid
           Expanded(
-            child: Consumer<BundlesProvider>(
-              builder: (context, bundlesProvider, child) {
+            child: Consumer2<BundlesProvider, ItemsProvider>(
+              builder: (context, bundlesProvider, itemsProvider, child) {
                 if (bundlesProvider.isLoading) {
                   return const Center(child: CircularProgressIndicator());
                 }
@@ -177,12 +178,12 @@ class _BundlesScreenState extends State<BundlesScreen> {
                 }
 
                 return GridView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 25.0),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    crossAxisSpacing: 16.0,
-                    mainAxisSpacing: 16.0,
-                    childAspectRatio: 0.5, // Adjusted to prevent overflow
+                    crossAxisSpacing: 4.0,
+                    mainAxisSpacing: 4.0,
+                    childAspectRatio: 0.6, // Adjusted to prevent overflow
                   ),
                   itemCount: bundlesProvider.bundles.length,
                   itemBuilder: (context, index) {
@@ -224,6 +225,13 @@ class _BundlesScreenState extends State<BundlesScreen> {
                         subtitle: bundle.description,
                         imagePath: bundle.imagePath,
                         isFavorite: bundle.isFavorite,
+                        isCompleted: () {
+                          final bundleItems = itemsProvider.items
+                              .where((item) => item.bundleId == bundle.id)
+                              .toList();
+                          return bundleItems.isNotEmpty &&
+                              bundleItems.every((item) => item.isChecked);
+                        }(),
                         onEdit: () {
                           context.push('/add_bundle', extra: bundle);
                         },
@@ -245,6 +253,7 @@ class BundleCard extends StatelessWidget {
   final String subtitle;
   final String? imagePath;
   final bool isFavorite;
+  final bool isCompleted;
   final VoidCallback? onEdit;
 
   const BundleCard({
@@ -253,6 +262,7 @@ class BundleCard extends StatelessWidget {
     required this.subtitle,
     this.imagePath,
     this.isFavorite = false,
+    this.isCompleted = false,
     this.onEdit,
   }) : super(key: key);
 
@@ -261,11 +271,11 @@ class BundleCard extends StatelessWidget {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(15),
         side: BorderSide(color: Colors.grey[200]!),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12.0), // Reduced padding
+        padding: const EdgeInsets.all(6.0), // Reduced padding
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -273,11 +283,14 @@ class BundleCard extends StatelessWidget {
             Stack(
               children: [
                 Container(
-                  height: 180, // Reduced height
+                  height: 160, // Reduced height
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    color: Colors.grey[50],
+                    color: isCompleted ? Colors.green[100] : Colors.grey[50],
                     borderRadius: BorderRadius.circular(10),
+                    border: isCompleted
+                        ? Border.all(color: Colors.green, width: 2)
+                        : null,
                   ),
                   child: imagePath != null
                       ? ClipRRect(
@@ -297,17 +310,17 @@ class BundleCard extends StatelessWidget {
                         )
                       : const Center(
                           child: Icon(
-                            Icons.image_outlined,
+                            Icons.shopping_bag_outlined,
                             color: Colors.blue,
-                            size: 48,
+                            size: 50,
                           ),
                         ),
                 ),
                 if (isFavorite)
                   const Positioned(
                     top: 4,
-                    right: 4,
-                    child: Icon(Icons.favorite, color: Colors.red, size: 30),
+                    right: 2,
+                    child: Icon(Icons.favorite, color: Colors.purple, size: 20),
                   ),
               ],
             ),
