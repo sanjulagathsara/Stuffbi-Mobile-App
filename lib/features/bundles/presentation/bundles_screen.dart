@@ -28,7 +28,7 @@ class _BundlesScreenState extends State<BundlesScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 5,
+        elevation: 0,
         toolbarHeight: 60,
         titleSpacing: 0,
         leadingWidth: 70,
@@ -98,9 +98,9 @@ class _BundlesScreenState extends State<BundlesScreen> {
                               )
                             : null,
                         filled: true,
-                        fillColor: Colors.grey[200],
+                        fillColor: Colors.grey[100],
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(15),
                           borderSide: BorderSide.none,
                         ),
                         contentPadding: const EdgeInsets.symmetric(vertical: 0),
@@ -137,7 +137,7 @@ class _BundlesScreenState extends State<BundlesScreen> {
                               ),
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(15),
                                 border: Border.all(color: Colors.grey[300]!),
                               ),
                               child: Row(
@@ -275,13 +275,14 @@ class BundleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 2,
+      elevation: 8,
+      color: isCompleted ? Colors.green[50] : Colors.grey[50],
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15),
-        side: BorderSide(color: Colors.grey[200]!),
+        side: BorderSide(color: Colors.grey[100]!),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(6.0),
+        padding: const EdgeInsets.all(8.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -289,18 +290,18 @@ class BundleCard extends StatelessWidget {
             Stack(
               children: [
                 Container(
-                  height: 160, // Reduced height
+                  height: 160,
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    color: isCompleted ? Colors.green[100] : Colors.grey[50],
-                    borderRadius: BorderRadius.circular(10),
-                    border: isCompleted
-                        ? Border.all(color: Colors.green, width: 2)
-                        : null,
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(
+                      color: isCompleted ? Colors.green[600]! : Colors.grey.shade300,
+                      width: isCompleted ? 3 : 1,
+                    ),
                   ),
                   child: imagePath != null
                       ? ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(15),
                           child: Image.file(
                             File(imagePath!),
                             fit: BoxFit.cover,
@@ -330,7 +331,7 @@ class BundleCard extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 12), // Reduced spacing
+            const SizedBox(height: 12), 
             Text(
               title,
               maxLines: 1,
@@ -344,7 +345,7 @@ class BundleCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               subtitle,
-              maxLines: 2,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 14, color: Colors.grey),
             ),
@@ -356,7 +357,7 @@ class BundleCard extends StatelessWidget {
                 child: Icon(
                   Icons.edit_outlined,
                   color: Colors.blue[500],
-                  size: 24,
+                  size: 16,
                 ),
               ),
             ),
