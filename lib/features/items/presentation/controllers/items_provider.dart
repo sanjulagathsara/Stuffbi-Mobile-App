@@ -4,6 +4,7 @@ import '../../data/items_repository_impl.dart';
 import '../../models/item_model.dart';
 import '../../../activity/data/activity_repository.dart';
 import '../../../activity/models/activity_log_model.dart';
+import '../../../bundles/presentation/providers/bundles_provider.dart';
 
 class ItemsProvider extends ChangeNotifier {
   final ItemsRepositoryImpl _repository = ItemsRepositoryImpl();
@@ -14,6 +15,13 @@ class ItemsProvider extends ChangeNotifier {
   final Set<String> _selectedItemIds = {};
   bool _isSelectionMode = false;
   String _searchQuery = '';
+  
+  // Reference to BundlesProvider for updating bundle completion status
+  BundlesProvider? _bundlesProvider;
+  
+  void setBundlesProvider(BundlesProvider provider) {
+    _bundlesProvider = provider;
+  }
 
   List<Item> get items => _filteredItems;
   bool get isLoading => _isLoading;
@@ -162,6 +170,17 @@ class ItemsProvider extends ChangeNotifier {
       notifyListeners();
 
       await _repository.updateItem(updatedItem);
+      
+      // Update bundle completion status if item belongs to a bundle
+      if (updatedItem.bundleId != null && _bundlesProvider != null) {
+        final bundleItems = _items
+            .where((i) => i.bundleId == updatedItem.bundleId)
+            .toList();
+        _bundlesProvider!.updateBundleCompletionStatus(
+          updatedItem.bundleId!, 
+          bundleItems,
+        );
+      }
 
       if (isChecking) {
         try {
@@ -196,6 +215,14 @@ class ItemsProvider extends ChangeNotifier {
     }
     _applySearch();
     notifyListeners();
+    
+    // Update bundle completion status (will be false after reset)
+    if (_bundlesProvider != null) {
+      final updatedBundleItems = _items
+          .where((item) => item.bundleId == bundleId)
+          .toList();
+      _bundlesProvider!.updateBundleCompletionStatus(bundleId, updatedBundleItems);
+    }
   }
 
   void moveItemsLocal(List<String> itemIds, String targetBundleId) {

@@ -14,11 +14,52 @@ class BundlesProvider extends ChangeNotifier {
   String _searchQuery = '';
   bool _showFavoritesOnly = false;
   String _sortOrder = 'asc'; // 'asc' or 'recent'
+  
+  // Cache for bundle completion status
+  final Map<String, bool> _bundleCompletionStatus = {};
 
   List<Bundle> get bundles => _filteredBundles;
   bool get isLoading => _isLoading;
   bool get showFavoritesOnly => _showFavoritesOnly;
   String get sortOrder => _sortOrder;
+  
+  /// Returns whether a bundle is completed checking (all items checked)
+  bool isBundleCompleted(String bundleId) {
+    return _bundleCompletionStatus[bundleId] ?? false;
+  }
+  
+  /// Updates the completion status for a specific bundle
+  /// Call this after items are checked/unchecked or moved
+  void updateBundleCompletionStatus(String bundleId, List<dynamic> bundleItems) {
+    final isCompleted = bundleItems.isNotEmpty && 
+        bundleItems.every((item) => item.isChecked == true);
+    
+    if (_bundleCompletionStatus[bundleId] != isCompleted) {
+      _bundleCompletionStatus[bundleId] = isCompleted;
+      notifyListeners();
+    }
+  }
+  
+  /// Updates completion status for all bundles at once
+  void updateAllBundleCompletionStatus(Map<String, List<dynamic>> bundleItemsMap) {
+    bool hasChanges = false;
+    
+    for (final entry in bundleItemsMap.entries) {
+      final bundleId = entry.key;
+      final bundleItems = entry.value;
+      final isCompleted = bundleItems.isNotEmpty && 
+          bundleItems.every((item) => item.isChecked == true);
+      
+      if (_bundleCompletionStatus[bundleId] != isCompleted) {
+        _bundleCompletionStatus[bundleId] = isCompleted;
+        hasChanges = true;
+      }
+    }
+    
+    if (hasChanges) {
+      notifyListeners();
+    }
+  }
 
   Future<void> loadBundles() async {
     _isLoading = true;

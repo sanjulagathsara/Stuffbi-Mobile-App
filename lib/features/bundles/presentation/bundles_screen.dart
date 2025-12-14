@@ -176,6 +176,18 @@ class _BundlesScreenState extends State<BundlesScreen> {
                 if (bundlesProvider.bundles.isEmpty) {
                   return const Center(child: Text('No bundles found.'));
                 }
+                
+                // Initialize completion status for all bundles
+                final bundleItemsMap = <String, List<dynamic>>{};
+                for (final bundle in bundlesProvider.bundles) {
+                  bundleItemsMap[bundle.id] = itemsProvider.items
+                      .where((item) => item.bundleId == bundle.id)
+                      .toList();
+                }
+                // Update all bundle completion statuses (only notifies if changed)
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  bundlesProvider.updateAllBundleCompletionStatus(bundleItemsMap);
+                });
 
                 return GridView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 25.0),
@@ -225,13 +237,7 @@ class _BundlesScreenState extends State<BundlesScreen> {
                         subtitle: bundle.description,
                         imagePath: bundle.imagePath,
                         isFavorite: bundle.isFavorite,
-                        isCompleted: () {
-                          final bundleItems = itemsProvider.items
-                              .where((item) => item.bundleId == bundle.id)
-                              .toList();
-                          return bundleItems.isNotEmpty &&
-                              bundleItems.every((item) => item.isChecked);
-                        }(),
+                        isCompleted: bundlesProvider.isBundleCompleted(bundle.id),
                         onEdit: () {
                           context.push('/add_bundle', extra: bundle);
                         },
@@ -275,7 +281,7 @@ class BundleCard extends StatelessWidget {
         side: BorderSide(color: Colors.grey[200]!),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(6.0), // Reduced padding
+        padding: const EdgeInsets.all(6.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

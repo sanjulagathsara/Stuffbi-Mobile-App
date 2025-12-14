@@ -19,8 +19,14 @@ void main() async {
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => ItemsProvider()..loadItems()),
         ChangeNotifierProvider(create: (_) => BundlesProvider()..loadBundles()),
+        ChangeNotifierProxyProvider<BundlesProvider, ItemsProvider>(
+          create: (_) => ItemsProvider()..loadItems(),
+          update: (_, bundlesProvider, itemsProvider) {
+            itemsProvider!.setBundlesProvider(bundlesProvider);
+            return itemsProvider;
+          },
+        ),
         ChangeNotifierProvider(create: (_) => ActivityProvider()),
       ],
       child: const App(),
