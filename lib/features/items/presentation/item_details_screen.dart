@@ -6,6 +6,7 @@ import 'controllers/items_provider.dart';
 import '../../bundles/presentation/providers/bundles_provider.dart';
 import '../../bundles/models/bundle_model.dart';
 import 'add_edit_item_screen.dart';
+import '../../../core/widgets/smart_s3_image.dart';
 
 class ItemDetailsScreen extends StatelessWidget {
   final String itemId;
@@ -81,15 +82,14 @@ class ItemDetailsScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (item.imagePath != null)
-                  Container(
-                    height: 250,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      image: DecorationImage(
-                        image: FileImage(File(item.imagePath!)),
-                        fit: BoxFit.cover,
-                      ),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SmartS3Image(
+                      imagePath: item.imagePath,
+                      itemServerId: item.serverId,
+                      width: double.infinity,
+                      height: 250,
+                      fit: BoxFit.cover,
                     ),
                   )
                 else

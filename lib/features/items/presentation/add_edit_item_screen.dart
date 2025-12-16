@@ -6,6 +6,7 @@ import '../models/item_model.dart';
 import 'controllers/items_provider.dart';
 import '../../bundles/presentation/providers/bundles_provider.dart';
 import '../../../core/services/s3_upload_service.dart';
+import '../../../core/services/image_url_service.dart';
 
 class AddEditItemScreen extends StatefulWidget {
   final Item? item;
@@ -85,28 +86,22 @@ final List<String> _categories = [
       setState(() => _isUploading = true);
       
       try {
-        String? displayImagePath = _imagePath;
-        String? s3ImageUrl;
+        String? finalImagePath = _imagePath;
         
         // If we have a new local image, upload to S3
         if (_isNewImage && _imagePath != null) {
           final s3Url = await S3UploadService().uploadItemImage(File(_imagePath!));
           if (s3Url != null) {
-            s3ImageUrl = s3Url;
-            // Keep local path for immediate display on new items
-            displayImagePath = _imagePath;
-            debugPrint('S3 upload successful: $s3Url, using local path for display');
+            // Store S3 URL for sync - this is what gets saved to backend
+            finalImagePath = s3Url;
+            // Cache local file path for immediate display
+            ImageUrlService().cacheLocalFile(s3Url, _imagePath!);
+            debugPrint('S3 upload successful: $s3Url, cached local path for display');
           } else {
             // S3 upload failed, continue with local path
             debugPrint('S3 upload failed, using local path');
           }
         }
-        
-        // For new items (no serverId), use local path for display
-        // For existing items with serverId, use S3 URL so it syncs
-        final finalImagePath = (widget.item?.serverId != null) 
-            ? (s3ImageUrl ?? displayImagePath) 
-            : displayImagePath;
         
         final provider = Provider.of<ItemsProvider>(context, listen: false);
         if (widget.item == null) {
@@ -123,7 +118,7 @@ final List<String> _categories = [
               name: _nameController.text,
               category: _selectedCategory ?? 'Other',
               details: _detailsController.text,
-              imagePath: s3ImageUrl ?? displayImagePath,
+              imagePath: finalImagePath,
               bundleId: _selectedBundleId,
             ),
           );

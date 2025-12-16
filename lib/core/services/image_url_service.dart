@@ -12,6 +12,10 @@ class ImageUrlService {
   // Cache for pre-signed URLs: key -> {url, expiresAt}
   final Map<String, _CachedUrl> _urlCache = {};
   
+  // Cache for local file paths: s3Url -> localPath
+  // Used for immediate display after upload before sync assigns serverId
+  final Map<String, String> _localFileCache = {};
+  
   // Default cache duration (slightly less than S3 2-hour expiry)
   static const Duration _cacheDuration = Duration(hours: 1, minutes: 50);
 
@@ -93,9 +97,21 @@ class ImageUrlService {
     return null;
   }
 
+  /// Cache a local file path for an S3 URL (for immediate display after upload)
+  void cacheLocalFile(String s3Url, String localPath) {
+    _localFileCache[s3Url] = localPath;
+  }
+
+  /// Get cached local file path for an S3 URL
+  String? getLocalFile(String? s3Url) {
+    if (s3Url == null) return null;
+    return _localFileCache[s3Url];
+  }
+
   /// Clear the URL cache
   void clearCache() {
     _urlCache.clear();
+    _localFileCache.clear();
   }
 }
 

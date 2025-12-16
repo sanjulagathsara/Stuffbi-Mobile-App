@@ -85,8 +85,14 @@ class _SmartS3ImageState extends State<SmartS3Image> {
           widget.imagePath,
         );
       } else {
-        // No server ID available - can't fetch pre-signed URL
-        debugPrint('[SmartS3Image] S3 URL but no server ID provided');
+        // No server ID available - check local file cache for recently uploaded images
+        final localPath = _imageUrlService.getLocalFile(widget.imagePath);
+        if (localPath != null) {
+          debugPrint('[SmartS3Image] Using cached local file: $localPath');
+          presignedUrl = localPath; // Use local path for display
+        } else {
+          debugPrint('[SmartS3Image] S3 URL but no server ID and no cached local file');
+        }
       }
 
       if (mounted) {

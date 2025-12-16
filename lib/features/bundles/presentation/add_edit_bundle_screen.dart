@@ -7,6 +7,7 @@ import 'providers/bundles_provider.dart';
 import '../models/bundle_model.dart';
 import '../../../core/widgets/smart_s3_image.dart';
 import '../../../core/services/s3_upload_service.dart';
+import '../../../core/services/image_url_service.dart';
 
 class AddEditBundleScreen extends StatefulWidget {
   final Bundle? bundle;
@@ -80,37 +81,32 @@ class _AddEditBundleScreenState extends State<AddEditBundleScreen> {
       try {
         final bundlesProvider = Provider.of<BundlesProvider>(context, listen: false);
         
-        // Determine final image path for display
-        String? displayImagePath = _existingImageUrl; // Start with existing URL if any
-        String? s3ImageUrl; // S3 URL for syncing
+        String? finalImagePath = _existingImageUrl; // Start with existing URL if any
         
         // If we have a new local image, upload to S3
         if (_isNewImage && _imageFile != null) {
           final s3Url = await S3UploadService().uploadBundleImage(_imageFile!);
           if (s3Url != null) {
-            s3ImageUrl = s3Url;
-            // Keep local path for immediate display
-            displayImagePath = _imageFile!.path;
-            debugPrint('S3 upload successful: $s3Url, using local path for display');
+            // Store S3 URL for sync - this is what gets saved to backend
+            finalImagePath = s3Url;
+            // Cache local file path for immediate display
+            ImageUrlService().cacheLocalFile(s3Url, _imageFile!.path);
+            debugPrint('S3 upload successful: $s3Url, cached local path for display');
           } else {
             // S3 upload failed, use local path
             debugPrint('S3 upload failed, using local path');
-            displayImagePath = _imageFile?.path;
+            finalImagePath = _imageFile?.path;
           }
         } else if (_imageFile != null && !_isNewImage) {
           // Existing local file (not a URL)
-          displayImagePath = _imageFile!.path;
+          finalImagePath = _imageFile!.path;
         }
-        
-        // For new bundles, use local path for display (s3Url will be synced)
-        // For bundles with serverId already, use existing URL
-        final imagePath = widget.bundle?.serverId != null ? (s3ImageUrl ?? displayImagePath) : displayImagePath;
         
         if (widget.bundle == null) {
           await bundlesProvider.addBundle(
             _nameController.text,
             _descriptionController.text,
-            imagePath,
+            finalImagePath,
             _selectedItemIds.toList(),
           );
         } else {
@@ -118,7 +114,7 @@ class _AddEditBundleScreenState extends State<AddEditBundleScreen> {
             widget.bundle!.copyWith(
               name: _nameController.text,
               description: _descriptionController.text,
-              imagePath: s3ImageUrl ?? displayImagePath,
+              imagePath: finalImagePath,
             ),
           );
           // Also update items assignment
