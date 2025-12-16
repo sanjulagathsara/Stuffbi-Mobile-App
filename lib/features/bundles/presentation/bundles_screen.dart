@@ -6,6 +6,7 @@ import 'providers/bundles_provider.dart';
 import '../../items/presentation/controllers/items_provider.dart';
 import '../../../core/sync/sync_service.dart';
 import '../../../core/sync/connectivity_service.dart';
+import '../../../core/widgets/smart_image.dart';
 //import 'add_edit_bundle_screen.dart';
 
 class BundlesScreen extends StatefulWidget {
@@ -37,10 +38,11 @@ class _BundlesScreenState extends State<BundlesScreen> {
 
     // Show loading indicator
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Syncing with cloud...'), duration: Duration(seconds: 1)),
+      const SnackBar(content: Text('Fetching all data from cloud...'), duration: Duration(seconds: 2)),
     );
 
-    final success = await syncService.performSync();
+    // Use fullSync to get ALL data from server
+    final success = await syncService.fullSync();
     
     if (mounted) {
       if (success) {
@@ -49,7 +51,7 @@ class _BundlesScreenState extends State<BundlesScreen> {
         Provider.of<ItemsProvider>(context, listen: false).loadItems();
         
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Sync complete!'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('Full sync complete!'), backgroundColor: Colors.green),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -352,29 +354,30 @@ class BundleCard extends StatelessWidget {
                       width: isCompleted ? 3 : 1,
                     ),
                   ),
-                  child: imagePath != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(15),
-                          child: Image.file(
-                            File(imagePath!),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(15),
+                    child: imagePath != null
+                        ? SmartImage(
+                            imagePath: imagePath,
+                            width: double.infinity,
+                            height: double.infinity,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Center(
-                                child: Icon(
-                                  Icons.broken_image,
-                                  color: Colors.blue,
-                                ),
-                              );
-                            },
+                            placeholder: const Center(
+                              child: Icon(
+                                Icons.shopping_bag_outlined,
+                                color: Colors.blue,
+                                size: 50,
+                              ),
+                            ),
+                          )
+                        : const Center(
+                            child: Icon(
+                              Icons.shopping_bag_outlined,
+                              color: Colors.blue,
+                              size: 50,
+                            ),
                           ),
-                        )
-                      : const Center(
-                          child: Icon(
-                            Icons.shopping_bag_outlined,
-                            color: Colors.blue,
-                            size: 50,
-                          ),
-                        ),
+                  ),
                 ),
                 if (isFavorite)
                   const Positioned(

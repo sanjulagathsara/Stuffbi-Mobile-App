@@ -1,3 +1,4 @@
+import 'package:uuid/uuid.dart';
 import '../../../core/sync/sync_status.dart';
 
 class Bundle {
@@ -59,12 +60,18 @@ class Bundle {
 
   /// Create from server JSON response
   factory Bundle.fromServerJson(Map<String, dynamic> json) {
+    // Generate a local ID if server bundle doesn't have client_id
+    // Use server ID to create a consistent local ID
+    final clientId = json['client_id'];
+    final serverId = json['id'];
+    final localId = clientId ?? (serverId != null ? 'server_$serverId' : const Uuid().v4());
+    
     return Bundle(
-      id: json['client_id'] ?? '',
-      name: json['title'] ?? '',
-      description: json['subtitle'] ?? '',
+      id: localId,
+      name: json['title'] ?? json['name'] ?? '',
+      description: json['subtitle'] ?? json['description'] ?? '',
       imagePath: json['image_url'],
-      serverId: json['id'],
+      serverId: serverId,
       syncStatus: SyncStatus.synced,
       updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at']) : null,
     );

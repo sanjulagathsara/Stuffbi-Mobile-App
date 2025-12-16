@@ -5,6 +5,7 @@ import '../../items/presentation/controllers/items_provider.dart';
 import '../models/bundle_model.dart';
 import 'package:go_router/go_router.dart';
 import 'providers/bundles_provider.dart';
+import '../../../core/widgets/smart_image.dart';
 
 class BundleDetailsScreen extends StatefulWidget {
   final Bundle bundle;
@@ -83,11 +84,12 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
               final targetBundle = otherBundles[index];
               return ListTile(
                 leading: targetBundle.imagePath != null
-                    ? Image.file(
-                        File(targetBundle.imagePath!),
+                    ? SmartImage(
+                        imagePath: targetBundle.imagePath,
                         width: 40,
                         height: 40,
                         fit: BoxFit.cover,
+                        borderRadius: BorderRadius.circular(4),
                       )
                     : const Icon(Icons.folder),
                 title: Text(targetBundle.name),
@@ -263,9 +265,12 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
                                       title: Text(item.name),
                                       subtitle: Text(item.category),
                                       secondary: item.imagePath != null
-                                          ? ClipRRect(
+                                          ? SmartImage(
+                                              imagePath: item.imagePath,
+                                              width: 40,
+                                              height: 40,
+                                              fit: BoxFit.cover,
                                               borderRadius: BorderRadius.circular(4),
-                                              child: Image.file(File(item.imagePath!), width: 40, height: 40, fit: BoxFit.cover),
                                             )
                                           : const Icon(Icons.image),
                                       value: isSelected,
@@ -492,14 +497,12 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
                     child: Row(
                       children: [
                         if (bundle.imagePath != null)
-                          ClipRRect(
+                          SmartImage(
+                            imagePath: bundle.imagePath,
+                            width: 80,
+                            height: 80,
+                            fit: BoxFit.cover,
                             borderRadius: BorderRadius.circular(8),
-                            child: Image.file(
-                              File(bundle.imagePath!),
-                              width: 80,
-                              height: 80,
-                              fit: BoxFit.cover,
-                            ),
                           ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -791,14 +794,12 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
                                         if (targetBundle.imagePath != null)
-                                          ClipRRect(
+                                          SmartImage(
+                                            imagePath: targetBundle.imagePath,
+                                            width: 40,
+                                            height: 40,
+                                            fit: BoxFit.cover,
                                             borderRadius: BorderRadius.circular(8),
-                                            child: Image.file(
-                                              File(targetBundle.imagePath!),
-                                              width: 40,
-                                              height: 40,
-                                              fit: BoxFit.cover,
-                                            ),
                                           )
                                         else
                                           const Icon(Icons.folder, color: Colors.white),
@@ -867,30 +868,29 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(12),
-                    ),
-                    image: item.imagePath != null
-                        ? DecorationImage(
-                            image: FileImage(File(item.imagePath!)),
-                            fit: BoxFit.cover,
-                            colorFilter: item.isChecked
-                                ? ColorFilter.mode(
-                                    Colors.white.withValues(alpha: 0.6),
-                                    BlendMode.srcOver,
-                                  )
-                                : null,
-                          )
-                        : null,
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(12),
                   ),
-                  child: item.imagePath == null
-                      ? const Center(
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Container(color: Colors.grey[200]),
+                      if (item.imagePath != null)
+                        SmartImage(
+                          imagePath: item.imagePath,
+                          fit: BoxFit.cover,
+                        ),
+                      if (item.imagePath != null && item.isChecked)
+                        Container(
+                          color: Colors.white.withOpacity(0.6),
+                        ),
+                      if (item.imagePath == null)
+                        const Center(
                           child: Icon(Icons.image, color: Colors.grey),
-                        )
-                      : null,
+                        ),
+                    ],
+                  ),
                 ),
               ),
               Padding(

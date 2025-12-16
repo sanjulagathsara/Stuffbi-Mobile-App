@@ -1,3 +1,4 @@
+import 'package:uuid/uuid.dart';
 import '../../../core/sync/sync_status.dart';
 
 class Item {
@@ -71,14 +72,24 @@ class Item {
 
   /// Create from server JSON response
   factory Item.fromServerJson(Map<String, dynamic> json) {
+    // Generate a local ID if server item doesn't have client_id
+    final clientId = json['client_id'];
+    final serverId = json['id'];
+    final localId = clientId ?? (serverId != null ? 'server_$serverId' : const Uuid().v4());
+    
+    // Handle bundle ID - could be client_id or server_id format
+    final bundleClientId = json['bundle_client_id'];
+    final bundleId = json['bundle_id'];
+    final localBundleId = bundleClientId ?? (bundleId != null ? 'server_$bundleId' : null);
+    
     return Item(
-      id: json['client_id'] ?? '',
+      id: localId,
       name: json['name'] ?? '',
       category: json['category'] ?? '',
-      bundleId: json['bundle_client_id'],
+      bundleId: localBundleId,
       imagePath: json['image_url'],
-      details: json['subtitle'] ?? '',
-      serverId: json['id'],
+      details: json['subtitle'] ?? json['details'] ?? '',
+      serverId: serverId,
       syncStatus: SyncStatus.synced,
       updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at']) : null,
     );

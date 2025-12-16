@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../items/presentation/controllers/items_provider.dart';
 import 'providers/bundles_provider.dart';
 import '../models/bundle_model.dart';
+import '../../../core/widgets/smart_image.dart';
 
 class AddEditBundleScreen extends StatefulWidget {
   final Bundle? bundle;
@@ -235,7 +236,13 @@ class _AddEditBundleScreenState extends State<AddEditBundleScreen> {
                           });
                         },
                         secondary: item.imagePath != null
-                            ? Image.file(File(item.imagePath!), width: 40, height: 40, fit: BoxFit.cover)
+                            ? SmartImage(
+                                imagePath: item.imagePath,
+                                width: 40,
+                                height: 40,
+                                fit: BoxFit.cover,
+                                borderRadius: BorderRadius.circular(4),
+                              )
                             : const Icon(Icons.image),
                       );
                     },

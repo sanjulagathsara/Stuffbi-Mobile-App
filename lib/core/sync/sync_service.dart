@@ -292,6 +292,127 @@ class SyncService extends ChangeNotifier {
     }
   }
 
+  /// Full sync - fetches ALL data from server and merges with local database
+  /// Uses last-write-wins based on updated_at timestamps
+  Future<bool> fullSync() async {
+    final isLoggedIn = await _apiService.isLoggedIn();
+    if (!isLoggedIn) {
+      print('[SyncService] Not logged in, skipping full sync');
+      return false;
+    }
+
+    if (!_connectivityService.isConnected) {
+      print('[SyncService] No connectivity, skipping full sync');
+      return false;
+    }
+
+    if (_isSyncing) {
+      print('[SyncService] Already syncing, skipping');
+      return false;
+    }
+
+    _isSyncing = true;
+    _lastError = null;
+    notifyListeners();
+
+    try {
+      print('[SyncService] Starting full sync...');
+
+      // First, push any local pending changes
+      final pendingItems = await _itemsRepo.getPendingItems();
+      final pendingItemDeletes = await _itemsRepo.getPendingDeleteIds();
+      final pendingBundles = await _bundlesRepo.getPendingBundles();
+      final pendingBundleDeletes = await _bundlesRepo.getPendingDeleteIds();
+
+      if (pendingItems.isNotEmpty || pendingBundles.isNotEmpty || 
+          pendingItemDeletes.isNotEmpty || pendingBundleDeletes.isNotEmpty) {
+        print('[SyncService] Pushing ${pendingItems.length} items, ${pendingBundles.length} bundles first...');
+        
+        final pushRequest = {
+          'items': {
+            'created': pendingItems.where((i) => i.serverId == null).map((i) => i.toServerJson()).toList(),
+            'updated': pendingItems.where((i) => i.serverId != null).map((i) => i.toServerJson()).toList(),
+            'deleted': pendingItemDeletes,
+          },
+          'bundles': {
+            'created': pendingBundles.where((b) => b.serverId == null).map((b) => b.toServerJson()).toList(),
+            'updated': pendingBundles.where((b) => b.serverId != null).map((b) => b.toServerJson()).toList(),
+            'deleted': pendingBundleDeletes,
+          },
+          'activity_logs': [],
+        };
+
+        final pushResponse = await _apiService.post('/sync', pushRequest);
+        if (pushResponse.success) {
+          await _processSyncResponse(pushResponse.data);
+        }
+      }
+
+      // Now fetch ALL data from server using existing endpoints
+      print('[SyncService] Fetching bundles from server...');
+      final bundlesResponse = await _apiService.get('/bundles');
+      
+      print('[SyncService] Fetching items from server...');
+      final itemsResponse = await _apiService.get('/items');
+
+      print('[SyncService] Bundles response: ${bundlesResponse.success}, Items response: ${itemsResponse.success}');
+
+      if (bundlesResponse.success || itemsResponse.success) {
+        // Merge bundles from server
+        if (bundlesResponse.success && bundlesResponse.data != null) {
+          final serverBundles = bundlesResponse.data as List<dynamic>;
+          if (serverBundles.isNotEmpty) {
+            print('[SyncService] Merging ${serverBundles.length} bundles from server');
+            final bundleModels = serverBundles.map((json) {
+              return Bundle.fromServerJson(json as Map<String, dynamic>);
+            }).toList();
+            await _bundlesRepo.mergeServerBundles(bundleModels);
+          }
+        }
+
+        // Merge items from server
+        if (itemsResponse.success && itemsResponse.data != null) {
+          final serverItems = itemsResponse.data as List<dynamic>;
+          if (serverItems.isNotEmpty) {
+            print('[SyncService] Merging ${serverItems.length} items from server');
+            final itemModels = serverItems.map((json) {
+              return Item.fromServerJson(json as Map<String, dynamic>);
+            }).toList();
+            await _itemsRepo.mergeServerItems(itemModels);
+          }
+        }
+
+        // Update last sync timestamp
+        _lastSyncAt = DateTime.now();
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('last_sync_at', _lastSyncAt!.toIso8601String());
+
+        print('[SyncService] Full sync completed successfully');
+
+        // Notify callbacks
+        for (final callback in _onSyncCompleteCallbacks) {
+          callback();
+        }
+
+        _isSyncing = false;
+        notifyListeners();
+        return true;
+      } else {
+        _lastError = bundlesResponse.error ?? itemsResponse.error ?? 'Full sync failed';
+        print('[SyncService] Full sync failed: $_lastError');
+        _isSyncing = false;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _lastError = e.toString();
+      print('[SyncService] Full sync error: $e');
+      _isSyncing = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   @override
   void dispose() {
     _periodicSyncTimer?.cancel();

@@ -173,34 +173,54 @@ class BundlesRepositoryImpl {
     final db = await _databaseHelper.database;
     
     for (final serverBundle in serverBundles) {
-      // Check if we have a local version
-      final existing = await db.query(
-        'bundles',
-        where: 'id = ? OR server_id = ?',
-        whereArgs: [serverBundle.id, serverBundle.serverId],
-      );
+      print('[BundlesRepo] Merging bundle: ${serverBundle.name}, id=${serverBundle.id}, serverId=${serverBundle.serverId}');
+      
+      // Check if we have a local version by server_id or matching local id
+      List<Map<String, dynamic>> existing = [];
+      
+      if (serverBundle.serverId != null) {
+        existing = await db.query(
+          'bundles',
+          where: 'server_id = ?',
+          whereArgs: [serverBundle.serverId],
+        );
+      }
+      
+      // If not found by server_id, check by local id
+      if (existing.isEmpty) {
+        existing = await db.query(
+          'bundles',
+          where: 'id = ?',
+          whereArgs: [serverBundle.id],
+        );
+      }
 
       if (existing.isEmpty) {
         // New bundle from server - insert
+        print('[BundlesRepo] Inserting new bundle: ${serverBundle.name}');
         await db.insert('bundles', serverBundle.toMap());
       } else {
         // Existing bundle - check for conflicts
         final localBundle = Bundle.fromMap(existing.first);
+        print('[BundlesRepo] Found existing bundle: ${localBundle.name}, checking timestamps');
         
         // Last-write-wins: compare updated_at
         if (serverBundle.updatedAt != null && localBundle.updatedAt != null) {
           if (serverBundle.updatedAt!.isAfter(localBundle.updatedAt!)) {
             // Server wins
+            print('[BundlesRepo] Server version is newer, updating');
             await db.update(
               'bundles',
               serverBundle.copyWith(id: localBundle.id).toMap(),
               where: 'id = ?',
               whereArgs: [localBundle.id],
             );
+          } else {
+            print('[BundlesRepo] Local version is newer, keeping local');
           }
-          // else: local wins, keep local version
         } else if (localBundle.syncStatus == SyncStatus.synced) {
           // Local is synced, update with server version
+          print('[BundlesRepo] Local is synced, updating with server version');
           await db.update(
             'bundles',
             serverBundle.copyWith(id: localBundle.id).toMap(),

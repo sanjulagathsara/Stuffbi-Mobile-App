@@ -137,34 +137,54 @@ class ItemsRepositoryImpl {
     final db = await _databaseHelper.database;
     
     for (final serverItem in serverItems) {
-      // Check if we have a local version
-      final existing = await db.query(
-        'items',
-        where: 'id = ? OR server_id = ?',
-        whereArgs: [serverItem.id, serverItem.serverId],
-      );
+      print('[ItemsRepo] Merging item: ${serverItem.name}, id=${serverItem.id}, serverId=${serverItem.serverId}');
+      
+      // Check if we have a local version by server_id or matching local id
+      List<Map<String, dynamic>> existing = [];
+      
+      if (serverItem.serverId != null) {
+        existing = await db.query(
+          'items',
+          where: 'server_id = ?',
+          whereArgs: [serverItem.serverId],
+        );
+      }
+      
+      // If not found by server_id, check by local id
+      if (existing.isEmpty) {
+        existing = await db.query(
+          'items',
+          where: 'id = ?',
+          whereArgs: [serverItem.id],
+        );
+      }
 
       if (existing.isEmpty) {
         // New item from server - insert
+        print('[ItemsRepo] Inserting new item: ${serverItem.name}');
         await db.insert('items', serverItem.toMap());
       } else {
         // Existing item - check for conflicts
         final localItem = Item.fromMap(existing.first);
+        print('[ItemsRepo] Found existing item: ${localItem.name}, checking timestamps');
         
         // Last-write-wins: compare updated_at
         if (serverItem.updatedAt != null && localItem.updatedAt != null) {
           if (serverItem.updatedAt!.isAfter(localItem.updatedAt!)) {
             // Server wins
+            print('[ItemsRepo] Server version is newer, updating');
             await db.update(
               'items',
               serverItem.copyWith(id: localItem.id).toMap(),
               where: 'id = ?',
               whereArgs: [localItem.id],
             );
+          } else {
+            print('[ItemsRepo] Local version is newer, keeping local');
           }
-          // else: local wins, keep local version
         } else if (localItem.syncStatus == SyncStatus.synced) {
           // Local is synced, update with server version
+          print('[ItemsRepo] Local is synced, updating with server version');
           await db.update(
             'items',
             serverItem.copyWith(id: localItem.id).toMap(),
