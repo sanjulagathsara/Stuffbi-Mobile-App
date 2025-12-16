@@ -126,9 +126,9 @@ class _ItemsScreenState extends State<ItemsScreen> {
                                 )
                               : null,
                           filled: true,
-                          fillColor: Colors.grey[200],
+                          fillColor: Colors.grey[100],
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(15),
                             borderSide: BorderSide.none,
                           ),
                           contentPadding: const EdgeInsets.symmetric(vertical: 0),
@@ -144,7 +144,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
                     : provider.items.isEmpty
                         ? const Center(child: Text('No items found'))
                         : ListView.separated(
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                            padding: const EdgeInsets.symmetric(horizontal: 25.0),
                             itemCount: provider.items.length,
                             separatorBuilder: (context, index) => Divider(
                               color: Colors.grey[200],

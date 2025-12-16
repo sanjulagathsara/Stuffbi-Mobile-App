@@ -112,6 +112,14 @@ class _ActivityScreenState extends State<ActivityScreen> {
         iconData = Icons.delete_outline;
         color = Colors.red;
         break;
+      case 'create_bundle':
+        iconData = Icons.add_circle_outline;
+        color = Colors.orange;
+        break;
+      case 'delete_bundle':
+        iconData = Icons.delete_outline;
+        color = Colors.red;
+        break;
       default:
         iconData = Icons.history;
         color = Colors.grey;
