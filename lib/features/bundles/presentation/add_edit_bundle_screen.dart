@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import '../../items/presentation/controllers/items_provider.dart';
 import 'providers/bundles_provider.dart';
 import '../models/bundle_model.dart';
-import '../../../core/widgets/smart_image.dart';
+import '../../../core/widgets/smart_s3_image.dart';
 
 class AddEditBundleScreen extends StatefulWidget {
   final Bundle? bundle;
@@ -236,8 +236,9 @@ class _AddEditBundleScreenState extends State<AddEditBundleScreen> {
                           });
                         },
                         secondary: item.imagePath != null
-                            ? SmartImage(
+                            ? SmartS3Image(
                                 imagePath: item.imagePath,
+                                itemServerId: item.serverId,
                                 width: 40,
                                 height: 40,
                                 fit: BoxFit.cover,

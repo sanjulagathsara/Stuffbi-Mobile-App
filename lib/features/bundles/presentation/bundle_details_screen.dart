@@ -5,7 +5,7 @@ import '../../items/presentation/controllers/items_provider.dart';
 import '../models/bundle_model.dart';
 import 'package:go_router/go_router.dart';
 import 'providers/bundles_provider.dart';
-import '../../../core/widgets/smart_image.dart';
+import '../../../core/widgets/smart_s3_image.dart';
 
 class BundleDetailsScreen extends StatefulWidget {
   final Bundle bundle;
@@ -84,8 +84,9 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
               final targetBundle = otherBundles[index];
               return ListTile(
                 leading: targetBundle.imagePath != null
-                    ? SmartImage(
+                    ? SmartS3Image(
                         imagePath: targetBundle.imagePath,
+                        bundleServerId: targetBundle.serverId,
                         width: 40,
                         height: 40,
                         fit: BoxFit.cover,
@@ -265,8 +266,9 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
                                       title: Text(item.name),
                                       subtitle: Text(item.category),
                                       secondary: item.imagePath != null
-                                          ? SmartImage(
+                                          ? SmartS3Image(
                                               imagePath: item.imagePath,
+                                              itemServerId: item.serverId,
                                               width: 40,
                                               height: 40,
                                               fit: BoxFit.cover,
@@ -497,8 +499,9 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
                     child: Row(
                       children: [
                         if (bundle.imagePath != null)
-                          SmartImage(
+                          SmartS3Image(
                             imagePath: bundle.imagePath,
+                            bundleServerId: bundle.serverId,
                             width: 80,
                             height: 80,
                             fit: BoxFit.cover,
@@ -794,8 +797,9 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
                                         if (targetBundle.imagePath != null)
-                                          SmartImage(
+                                          SmartS3Image(
                                             imagePath: targetBundle.imagePath,
+                                            bundleServerId: targetBundle.serverId,
                                             width: 40,
                                             height: 40,
                                             fit: BoxFit.cover,
@@ -877,8 +881,9 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
                     children: [
                       Container(color: Colors.grey[200]),
                       if (item.imagePath != null)
-                        SmartImage(
+                        SmartS3Image(
                           imagePath: item.imagePath,
+                          itemServerId: item.serverId,
                           fit: BoxFit.cover,
                         ),
                       if (item.imagePath != null && item.isChecked)

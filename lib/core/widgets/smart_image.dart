@@ -36,7 +36,7 @@ class SmartImage extends StatelessWidget {
     Widget imageWidget;
 
     if (isNetworkImage) {
-      // Network image (S3, etc.)
+      // Network image
       imageWidget = Image.network(
         imagePath!,
         width: width,
@@ -47,13 +47,11 @@ class SmartImage extends StatelessWidget {
           return SizedBox(
             width: width,
             height: height,
-            child: Center(
-              child: CircularProgressIndicator(
-                value: loadingProgress.expectedTotalBytes != null
-                    ? loadingProgress.cumulativeBytesLoaded /
-                        loadingProgress.expectedTotalBytes!
-                    : null,
-                strokeWidth: 2,
+            child: const Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
               ),
             ),
           );
@@ -121,3 +119,4 @@ class SmartImage extends StatelessWidget {
     );
   }
 }
+

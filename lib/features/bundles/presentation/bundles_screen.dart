@@ -6,7 +6,7 @@ import 'providers/bundles_provider.dart';
 import '../../items/presentation/controllers/items_provider.dart';
 import '../../../core/sync/sync_service.dart';
 import '../../../core/sync/connectivity_service.dart';
-import '../../../core/widgets/smart_image.dart';
+import '../../../core/widgets/smart_s3_image.dart';
 //import 'add_edit_bundle_screen.dart';
 
 class BundlesScreen extends StatefulWidget {
@@ -291,6 +291,7 @@ class _BundlesScreenState extends State<BundlesScreen> {
                         title: bundle.name,
                         subtitle: bundle.description,
                         imagePath: bundle.imagePath,
+                        bundleServerId: bundle.serverId,
                         isFavorite: bundle.isFavorite,
                         isCompleted: bundlesProvider.isBundleCompleted(bundle.id),
                         onEdit: () {
@@ -313,6 +314,7 @@ class BundleCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final String? imagePath;
+  final int? bundleServerId;
   final bool isFavorite;
   final bool isCompleted;
   final VoidCallback? onEdit;
@@ -322,6 +324,7 @@ class BundleCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.imagePath,
+    this.bundleServerId,
     this.isFavorite = false,
     this.isCompleted = false,
     this.onEdit,
@@ -357,8 +360,9 @@ class BundleCard extends StatelessWidget {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(15),
                     child: imagePath != null
-                        ? SmartImage(
+                        ? SmartS3Image(
                             imagePath: imagePath,
+                            bundleServerId: bundleServerId,
                             width: double.infinity,
                             height: double.infinity,
                             fit: BoxFit.cover,
