@@ -5,6 +5,7 @@ import 'controllers/items_provider.dart';
 import '../../bundles/presentation/providers/bundles_provider.dart';
 import 'add_edit_item_screen.dart';
 import 'item_details_screen.dart';
+import '../../../core/widgets/smart_s3_image.dart';
 
 class ItemsScreen extends StatefulWidget {
   const ItemsScreen({super.key});
@@ -176,28 +177,28 @@ class _ItemsScreenState extends State<ItemsScreen> {
                                   child: Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Container(
-                                        width: 60,
-                                        height: 60,
-                                        decoration: BoxDecoration(
-                                          color: Colors.grey[200],
-                                          borderRadius: BorderRadius.circular(8),
-                                          image: item.imagePath != null
-                                              ? DecorationImage(
-                                                  image: FileImage(File(item.imagePath!)),
-                                                  fit: BoxFit.cover,
-                                                )
-                                              : null,
-                                        ),
-                                        child: item.imagePath == null
-                                            ? const Center(
-                                                child: Icon(
-                                                  Icons.image_outlined,
-                                                  color: Colors.grey,
-                                                  size: 32,
-                                                ),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: item.imagePath != null
+                                            ? SmartS3Image(
+                                                imagePath: item.imagePath,
+                                                itemServerId: item.serverId,
+                                                width: 60,
+                                                height: 60,
+                                                fit: BoxFit.cover,
                                               )
-                                            : null,
+                                            : Container(
+                                                width: 60,
+                                                height: 60,
+                                                color: Colors.grey[200],
+                                                child: const Center(
+                                                  child: Icon(
+                                                    Icons.image_outlined,
+                                                    color: Colors.grey,
+                                                    size: 32,
+                                                  ),
+                                                ),
+                                              ),
                                       ),
                                       const SizedBox(width: 16),
                                       Expanded(
@@ -415,22 +416,22 @@ class _BundleSelectionSheetState extends State<_BundleSelectionSheet> {
                     final bundle = filteredBundles[index];
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
-                      leading: Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(8),
-                          image: bundle.imagePath != null
-                              ? DecorationImage(
-                                  image: FileImage(File(bundle.imagePath!)),
-                                  fit: BoxFit.cover,
-                                )
-                              : null,
-                        ),
-                        child: bundle.imagePath == null
-                            ? const Icon(Icons.inventory_2_outlined, color: Colors.grey)
-                            : null,
+                      leading: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: bundle.imagePath != null
+                            ? SmartS3Image(
+                                imagePath: bundle.imagePath,
+                                bundleServerId: bundle.serverId,
+                                width: 50,
+                                height: 50,
+                                fit: BoxFit.cover,
+                              )
+                            : Container(
+                                width: 50,
+                                height: 50,
+                                color: Colors.grey[200],
+                                child: const Icon(Icons.inventory_2_outlined, color: Colors.grey),
+                              ),
                       ),
                       title: Text(
                         bundle.name,
