@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'providers/bundles_provider.dart';
 import '../../items/presentation/controllers/items_provider.dart';
+import '../../../core/sync/sync_service.dart';
+import '../../../core/sync/connectivity_service.dart';
 //import 'add_edit_bundle_screen.dart';
 
 class BundlesScreen extends StatefulWidget {
@@ -22,6 +24,41 @@ class _BundlesScreenState extends State<BundlesScreen> {
     super.dispose();
   }
 
+  Future<void> _refreshFromCloud() async {
+    final syncService = SyncService();
+    final connectivityService = ConnectivityService();
+    
+    if (!connectivityService.isConnected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No internet connection'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
+    // Show loading indicator
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Syncing with cloud...'), duration: Duration(seconds: 1)),
+    );
+
+    final success = await syncService.performSync();
+    
+    if (mounted) {
+      if (success) {
+        // Reload data from local database
+        Provider.of<BundlesProvider>(context, listen: false).loadBundles();
+        Provider.of<ItemsProvider>(context, listen: false).loadItems();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sync complete!'), backgroundColor: Colors.green),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Sync failed: ${syncService.lastError ?? "Unknown error"}'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -34,6 +71,22 @@ class _BundlesScreenState extends State<BundlesScreen> {
         leadingWidth: 70,
         leading: null,
         actions: [
+          // Cloud Sync Button
+          Consumer<SyncService>(
+            builder: (context, syncService, child) {
+              return IconButton(
+                icon: syncService.isSyncing
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.cloud_sync, color: Colors.blue, size: 28),
+                onPressed: syncService.isSyncing ? null : _refreshFromCloud,
+                tooltip: 'Sync with cloud',
+              );
+            },
+          ),
           Consumer<BundlesProvider>(
             builder: (context, provider, child) {
               return IconButton(

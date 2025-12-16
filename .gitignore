@@ -57,6 +57,13 @@ unlinked_spec.ds
 **/android/key.properties
 *.jks
 
+# Android Studio / IntelliJ
+.idea/
+*.iml
+
+# API Documentation
+# Api_documentation.md
+
 # iOS/XCode related
 **/ios/**/*.mode1v3
 **/ios/**/*.mode2v3

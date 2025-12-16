@@ -7,6 +7,8 @@ import 'features/items/presentation/controllers/items_provider.dart';
 import 'features/bundles/presentation/providers/bundles_provider.dart';
 import 'features/activity/presentation/providers/activity_provider.dart';
 import 'core/services/settings_service.dart';
+import 'core/sync/connectivity_service.dart';
+import 'core/sync/sync_service.dart';
 
 void main() async {
   if (Platform.isWindows || Platform.isLinux) {
@@ -16,6 +18,11 @@ void main() async {
   
   WidgetsFlutterBinding.ensureInitialized();
   await SettingsService().init();
+  
+  // Initialize sync services
+  await ConnectivityService().initialize();
+  await SyncService().initialize();
+  
   runApp(
     MultiProvider(
       providers: [
@@ -28,8 +35,12 @@ void main() async {
           },
         ),
         ChangeNotifierProvider(create: (_) => ActivityProvider()),
+        // Sync services
+        ChangeNotifierProvider.value(value: ConnectivityService()),
+        ChangeNotifierProvider.value(value: SyncService()),
       ],
       child: const App(),
     ),
   );
 }
+

@@ -4,10 +4,12 @@ import '../../data/bundles_repository_impl.dart';
 import '../../models/bundle_model.dart';
 import '../../../activity/data/activity_repository.dart';
 import '../../../activity/models/activity_log_model.dart';
+import '../../../../core/sync/sync_service.dart';
 
 class BundlesProvider extends ChangeNotifier {
   final BundlesRepositoryImpl _repository = BundlesRepositoryImpl();
   final ActivityRepository _activityRepository = ActivityRepository();
+  final SyncService _syncService = SyncService();
   List<Bundle> _bundles = [];
   List<Bundle> _filteredBundles = [];
   bool _isLoading = false;
@@ -114,11 +116,13 @@ class BundlesProvider extends ChangeNotifier {
       }
     }
     await loadBundles();
+    _syncService.scheduleSync(); // Trigger sync
   }
 
   Future<void> updateBundle(Bundle bundle) async {
     await _repository.updateBundle(bundle);
     await loadBundles();
+    _syncService.scheduleSync(); // Trigger sync
   }
 
   Future<void> deleteBundle(String id) async {
@@ -139,6 +143,7 @@ class BundlesProvider extends ChangeNotifier {
     }
 
     await loadBundles();
+    _syncService.scheduleSync(); // Trigger sync
   }
 
   Future<void> moveItemsToBundle(String targetBundleId, List<String> itemIds) async {

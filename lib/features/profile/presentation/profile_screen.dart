@@ -26,6 +26,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadProfile() async {
     final token = await auth.getToken();
+    print('[ProfileScreen] Token: ${token != null ? "exists (${token.length} chars)" : "null"}');
 
     if (token == null) {
       // Guest mode
@@ -39,6 +40,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // Logged-in mode: try fetch /me
     try {
       final data = await auth.getMe();
+      print('[ProfileScreen] getMe success: $data');
       setState(() {
         isGuest = false;
         user = data;
@@ -46,6 +48,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
     } catch (e) {
       // Token invalid or backend error → treat as guest
+      print('[ProfileScreen] getMe failed: $e');
       setState(() {
         isGuest = true;
         loading = false;
@@ -134,8 +137,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   //          UI FOR LOGGED-IN AUTH USER
   // -------------------------------------------------
   Widget _buildUserUI(BuildContext context) {
-    final name = "${user!['firstName']} ${user!['lastName']}";
-    final email = user!['email'];
+    // Handle different user data formats
+    final firstName = user!['firstName'] ?? user!['first_name'] ?? '';
+    final lastName = user!['lastName'] ?? user!['last_name'] ?? '';
+    final name = (firstName.isEmpty && lastName.isEmpty) 
+        ? (user!['email'] ?? 'User').split('@')[0]  // Use email prefix as name
+        : "$firstName $lastName".trim();
+    final email = user!['email'] ?? '';
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),

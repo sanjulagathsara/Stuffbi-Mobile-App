@@ -28,7 +28,17 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> login(String email, String password) async {
     final res = await api.login({"email": email, "password": password});
 
-    await api.saveToken(res["token"]);
+    // Handle different response formats for token
+    final token = res["token"] ?? res["accessToken"] ?? res["access_token"];
+    if (token == null) {
+      throw Exception("No token received from server");
+    }
+    await api.saveToken(token);
+
+    // Save user data if present in response
+    if (res["user"] != null) {
+      await api.saveUserData(res["user"]);
+    }
   }
 
   @override

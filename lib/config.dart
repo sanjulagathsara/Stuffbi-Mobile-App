@@ -1,3 +1,5 @@
 class AppConfig {
-  static const String baseUrl = "http://13.60.37.201:8080/api";
+  // Production: "http://13.60.37.201:8080/api"
+  // Local testing:
+  static const String baseUrl = "http://10.0.2.2:4000";
 }

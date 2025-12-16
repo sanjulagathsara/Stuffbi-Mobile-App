@@ -5,10 +5,12 @@ import '../../models/item_model.dart';
 import '../../../activity/data/activity_repository.dart';
 import '../../../activity/models/activity_log_model.dart';
 import '../../../bundles/presentation/providers/bundles_provider.dart';
+import '../../../../core/sync/sync_service.dart';
 
 class ItemsProvider extends ChangeNotifier {
   final ItemsRepositoryImpl _repository = ItemsRepositoryImpl();
   final ActivityRepository _activityRepository = ActivityRepository();
+  final SyncService _syncService = SyncService();
   List<Item> _items = [];
   List<Item> _filteredItems = [];
   bool _isLoading = false;
@@ -67,11 +69,14 @@ class ItemsProvider extends ChangeNotifier {
     }
 
     await loadItems();
+    print('[ItemsProvider] Triggering sync after addItem');
+    _syncService.scheduleSync(); // Trigger sync
   }
 
   Future<void> updateItem(Item item) async {
     await _repository.updateItem(item);
     await loadItems();
+    _syncService.scheduleSync(); // Trigger sync
   }
 
   Future<void> deleteItem(String id) async {
@@ -93,6 +98,7 @@ class ItemsProvider extends ChangeNotifier {
     }
 
     await loadItems();
+    _syncService.scheduleSync(); // Trigger sync
   }
 
   Future<void> deleteSelectedItems() async {
@@ -114,6 +120,7 @@ class ItemsProvider extends ChangeNotifier {
     _selectedItemIds.clear();
     _isSelectionMode = false;
     await loadItems();
+    _syncService.scheduleSync(); // Trigger sync
   }
 
   void searchItems(String query) {
