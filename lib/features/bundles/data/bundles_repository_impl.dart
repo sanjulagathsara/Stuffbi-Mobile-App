@@ -243,5 +243,29 @@ class BundlesRepositoryImpl {
     if (maps.isEmpty) return null;
     return Bundle.fromMap(maps.first);
   }
+
+  /// Delete local bundles that don't exist on server (server IDs not in list)
+  Future<void> deleteNonServerBundles(Set<int> serverBundleIds) async {
+    final db = await _databaseHelper.database;
+    
+    // Get all local bundles that have a server_id (synced from server)
+    final localBundles = await db.query(
+      'bundles',
+      where: 'server_id IS NOT NULL',
+    );
+    
+    for (final bundleMap in localBundles) {
+      final serverId = bundleMap['server_id'] as int?;
+      if (serverId != null && !serverBundleIds.contains(serverId)) {
+        // This bundle exists locally but not on server - delete it
+        print('[BundlesRepo] Deleting bundle with server_id=$serverId (no longer on server)');
+        await db.delete(
+          'bundles',
+          where: 'server_id = ?',
+          whereArgs: [serverId],
+        );
+      }
+    }
+  }
 }
 

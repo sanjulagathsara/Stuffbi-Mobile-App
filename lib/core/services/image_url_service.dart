@@ -32,7 +32,8 @@ class ImageUrlService {
       return originalUrl;
     }
 
-    final cacheKey = 'item_$itemId';
+    // Cache key includes URL to invalidate when image changes
+    final cacheKey = 'item_${itemId}_${originalUrl.hashCode}';
     
     // Check cache
     final cached = _urlCache[cacheKey];
@@ -66,7 +67,8 @@ class ImageUrlService {
       return originalUrl;
     }
 
-    final cacheKey = 'bundle_$bundleId';
+    // Cache key includes URL to invalidate when image changes
+    final cacheKey = 'bundle_${bundleId}_${originalUrl.hashCode}';
     
     // Check cache
     final cached = _urlCache[cacheKey];

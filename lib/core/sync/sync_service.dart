@@ -358,16 +358,26 @@ class SyncService extends ChangeNotifier {
       print('[SyncService] Bundles response: ${bundlesResponse.success}, Items response: ${itemsResponse.success}');
 
       if (bundlesResponse.success || itemsResponse.success) {
+        // Track server IDs for deletion cleanup
+        final Set<int> serverBundleIds = {};
+        final Set<int> serverItemIds = {};
+        
         // Merge bundles from server
         if (bundlesResponse.success && bundlesResponse.data != null) {
           final serverBundles = bundlesResponse.data as List<dynamic>;
           if (serverBundles.isNotEmpty) {
             print('[SyncService] Merging ${serverBundles.length} bundles from server');
             final bundleModels = serverBundles.map((json) {
-              return Bundle.fromServerJson(json as Map<String, dynamic>);
+              final bundle = Bundle.fromServerJson(json as Map<String, dynamic>);
+              if (bundle.serverId != null) {
+                serverBundleIds.add(bundle.serverId!);
+              }
+              return bundle;
             }).toList();
             await _bundlesRepo.mergeServerBundles(bundleModels);
           }
+          // Delete local bundles that no longer exist on server
+          await _bundlesRepo.deleteNonServerBundles(serverBundleIds);
         }
 
         // Merge items from server
@@ -376,10 +386,16 @@ class SyncService extends ChangeNotifier {
           if (serverItems.isNotEmpty) {
             print('[SyncService] Merging ${serverItems.length} items from server');
             final itemModels = serverItems.map((json) {
-              return Item.fromServerJson(json as Map<String, dynamic>);
+              final item = Item.fromServerJson(json as Map<String, dynamic>);
+              if (item.serverId != null) {
+                serverItemIds.add(item.serverId!);
+              }
+              return item;
             }).toList();
             await _itemsRepo.mergeServerItems(itemModels);
           }
+          // Delete local items that no longer exist on server
+          await _itemsRepo.deleteNonServerItems(serverItemIds);
         }
 
         // Update last sync timestamp

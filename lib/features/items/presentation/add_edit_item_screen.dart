@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../models/item_model.dart';
 import 'controllers/items_provider.dart';
 import '../../bundles/presentation/providers/bundles_provider.dart';
+import '../../../core/services/s3_upload_service.dart';
 
 class AddEditItemScreen extends StatefulWidget {
   final Item? item;
@@ -22,6 +23,8 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   String? _selectedCategory;
   String? _selectedBundleId;
   String? _imagePath;
+  bool _isNewImage = false; // Track if user picked a new local image
+  bool _isUploading = false;
 
 final List<String> _categories = [
   'Electronics',
@@ -64,6 +67,7 @@ final List<String> _categories = [
       if (pickedFile != null) {
         setState(() {
           _imagePath = pickedFile.path;
+          _isNewImage = true; // Mark as new local image that needs uploading
         });
       }
     } catch (e) {
@@ -78,14 +82,39 @@ final List<String> _categories = [
 
   Future<void> _saveItem() async {
     if (_formKey.currentState!.validate()) {
+      setState(() => _isUploading = true);
+      
       try {
+        String? displayImagePath = _imagePath;
+        String? s3ImageUrl;
+        
+        // If we have a new local image, upload to S3
+        if (_isNewImage && _imagePath != null) {
+          final s3Url = await S3UploadService().uploadItemImage(File(_imagePath!));
+          if (s3Url != null) {
+            s3ImageUrl = s3Url;
+            // Keep local path for immediate display on new items
+            displayImagePath = _imagePath;
+            debugPrint('S3 upload successful: $s3Url, using local path for display');
+          } else {
+            // S3 upload failed, continue with local path
+            debugPrint('S3 upload failed, using local path');
+          }
+        }
+        
+        // For new items (no serverId), use local path for display
+        // For existing items with serverId, use S3 URL so it syncs
+        final finalImagePath = (widget.item?.serverId != null) 
+            ? (s3ImageUrl ?? displayImagePath) 
+            : displayImagePath;
+        
         final provider = Provider.of<ItemsProvider>(context, listen: false);
         if (widget.item == null) {
           await provider.addItem(
             _nameController.text,
             _selectedCategory ?? 'Other',
             _detailsController.text,
-            _imagePath,
+            finalImagePath,
             _selectedBundleId,
           );
         } else {
@@ -94,7 +123,7 @@ final List<String> _categories = [
               name: _nameController.text,
               category: _selectedCategory ?? 'Other',
               details: _detailsController.text,
-              imagePath: _imagePath,
+              imagePath: s3ImageUrl ?? displayImagePath,
               bundleId: _selectedBundleId,
             ),
           );
@@ -109,6 +138,10 @@ final List<String> _categories = [
             SnackBar(content: Text('Failed to save item: $e')),
           );
         }
+      } finally {
+        if (mounted) {
+          setState(() => _isUploading = false);
+        }
       }
     }
   }
@@ -119,10 +152,20 @@ final List<String> _categories = [
       appBar: AppBar(
         title: Text(widget.item == null ? 'Add Item' : 'Edit Item'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.check),
-            onPressed: _saveItem,
-          ),
+          if (_isUploading)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.check),
+              onPressed: _saveItem,
+            ),
         ],
       ),
       body: SingleChildScrollView(

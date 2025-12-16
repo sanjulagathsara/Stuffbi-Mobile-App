@@ -207,5 +207,29 @@ class ItemsRepositoryImpl {
     if (maps.isEmpty) return null;
     return Item.fromMap(maps.first);
   }
+
+  /// Delete local items that don't exist on server (server IDs not in list)
+  Future<void> deleteNonServerItems(Set<int> serverItemIds) async {
+    final db = await _databaseHelper.database;
+    
+    // Get all local items that have a server_id (synced from server)
+    final localItems = await db.query(
+      'items',
+      where: 'server_id IS NOT NULL',
+    );
+    
+    for (final itemMap in localItems) {
+      final serverId = itemMap['server_id'] as int?;
+      if (serverId != null && !serverItemIds.contains(serverId)) {
+        // This item exists locally but not on server - delete it
+        print('[ItemsRepo] Deleting item with server_id=$serverId (no longer on server)');
+        await db.delete(
+          'items',
+          where: 'server_id = ?',
+          whereArgs: [serverId],
+        );
+      }
+    }
+  }
 }
 
