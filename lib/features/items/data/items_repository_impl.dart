@@ -101,6 +101,17 @@ class ItemsRepositoryImpl {
     return maps.map((m) => Item.fromMap(m)).toList();
   }
 
+  /// Get pending items that have a server_id (for conflict detection)
+  Future<List<Item>> getPendingSyncedItems() async {
+    final db = await _databaseHelper.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'items',
+      where: "sync_status = ? AND server_id IS NOT NULL",
+      whereArgs: [SyncStatus.pending.toDbString()],
+    );
+    return maps.map((m) => Item.fromMap(m)).toList();
+  }
+
   /// Get items pending deletion (soft-deleted but not synced)
   Future<List<String>> getPendingDeleteIds() async {
     final db = await _databaseHelper.database;
@@ -222,6 +233,38 @@ class ItemsRepositoryImpl {
       final serverId = itemMap['server_id'] as int?;
       if (serverId != null && !serverItemIds.contains(serverId)) {
         // This item exists locally but not on server - delete it
+        print('[ItemsRepo] Deleting item with server_id=$serverId (no longer on server)');
+        await db.delete(
+          'items',
+          where: 'server_id = ?',
+          whereArgs: [serverId],
+        );
+      }
+    }
+  }
+
+  /// Delete local items that don't exist on server, except those in conflict list
+  Future<void> deleteNonServerItemsExcept(Set<int> serverItemIds, Set<String> exceptLocalIds) async {
+    final db = await _databaseHelper.database;
+    
+    // Get all local items that have a server_id (synced from server)
+    final localItems = await db.query(
+      'items',
+      where: 'server_id IS NOT NULL',
+    );
+    
+    for (final itemMap in localItems) {
+      final serverId = itemMap['server_id'] as int?;
+      final localId = itemMap['id'] as String?;
+      
+      if (serverId != null && !serverItemIds.contains(serverId)) {
+        // This item doesn't exist on server
+        if (localId != null && exceptLocalIds.contains(localId)) {
+          // Skip - this is in conflict list
+          print('[ItemsRepo] Skipping deletion of item with server_id=$serverId (in conflict)');
+          continue;
+        }
+        // Delete it
         print('[ItemsRepo] Deleting item with server_id=$serverId (no longer on server)');
         await db.delete(
           'items',

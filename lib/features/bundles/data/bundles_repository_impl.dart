@@ -127,6 +127,17 @@ class BundlesRepositoryImpl {
     return maps.map((m) => Bundle.fromMap(m)).toList();
   }
 
+  /// Get pending bundles that have a server_id (for conflict detection)
+  Future<List<Bundle>> getPendingSyncedBundles() async {
+    final db = await _databaseHelper.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'bundles',
+      where: "sync_status = ? AND server_id IS NOT NULL",
+      whereArgs: [SyncStatus.pending.toDbString()],
+    );
+    return maps.map((m) => Bundle.fromMap(m)).toList();
+  }
+
   /// Get bundles pending deletion (soft-deleted but not synced)
   Future<List<String>> getPendingDeleteIds() async {
     final db = await _databaseHelper.database;
@@ -258,6 +269,38 @@ class BundlesRepositoryImpl {
       final serverId = bundleMap['server_id'] as int?;
       if (serverId != null && !serverBundleIds.contains(serverId)) {
         // This bundle exists locally but not on server - delete it
+        print('[BundlesRepo] Deleting bundle with server_id=$serverId (no longer on server)');
+        await db.delete(
+          'bundles',
+          where: 'server_id = ?',
+          whereArgs: [serverId],
+        );
+      }
+    }
+  }
+
+  /// Delete local bundles that don't exist on server, except those in conflict list
+  Future<void> deleteNonServerBundlesExcept(Set<int> serverBundleIds, Set<String> exceptLocalIds) async {
+    final db = await _databaseHelper.database;
+    
+    // Get all local bundles that have a server_id (synced from server)
+    final localBundles = await db.query(
+      'bundles',
+      where: 'server_id IS NOT NULL',
+    );
+    
+    for (final bundleMap in localBundles) {
+      final serverId = bundleMap['server_id'] as int?;
+      final localId = bundleMap['id'] as String?;
+      
+      if (serverId != null && !serverBundleIds.contains(serverId)) {
+        // This bundle doesn't exist on server
+        if (localId != null && exceptLocalIds.contains(localId)) {
+          // Skip - this is in conflict list
+          print('[BundlesRepo] Skipping deletion of bundle with server_id=$serverId (in conflict)');
+          continue;
+        }
+        // Delete it
         print('[BundlesRepo] Deleting bundle with server_id=$serverId (no longer on server)');
         await db.delete(
           'bundles',

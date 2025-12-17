@@ -12,8 +12,10 @@ import '../features/bundles/presentation/bundle_details_screen.dart';
 import '../features/bundles/models/bundle_model.dart';
 import '../features/bundles/presentation/add_edit_bundle_screen.dart';
 import '../features/activity/presentation/activity_screen.dart';
+import 'app.dart';
 
 final GoRouter appRouter = GoRouter(
+  navigatorKey: navigatorKey,
   initialLocation: '/splash',
   routes: [
     GoRoute(path: '/splash', builder: (_, _) => const SplashScreen()),

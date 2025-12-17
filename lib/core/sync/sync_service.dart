@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../network/api_service.dart';
 import 'connectivity_service.dart';
 import 'sync_status.dart';
+import 'sync_conflict.dart';
 import '../../features/items/data/items_repository_impl.dart';
 import '../../features/items/models/item_model.dart';
 import '../../features/bundles/data/bundles_repository_impl.dart';
@@ -26,16 +27,24 @@ class SyncService extends ChangeNotifier {
   DateTime? _lastSyncAt;
   String? _lastError;
   
+  // Conflicts detected during sync (items/bundles deleted on server with pending local changes)
+  final List<SyncConflict> _pendingConflicts = [];
+  
   // Sync interval: 5 minutes
   static const Duration _syncInterval = Duration(minutes: 5);
   
   // Callbacks for notifying repositories
   final List<Function()> _onSyncCompleteCallbacks = [];
+  
+  // Callback for conflict resolution
+  Function(List<SyncConflict>)? _onConflictsDetected;
 
   bool get isSyncing => _isSyncing;
   bool get isInitialized => _isInitialized;
   DateTime? get lastSyncAt => _lastSyncAt;
   String? get lastError => _lastError;
+  List<SyncConflict> get pendingConflicts => List.unmodifiable(_pendingConflicts);
+  bool get hasConflicts => _pendingConflicts.isNotEmpty;
 
   /// Initialize sync service
   Future<void> initialize() async {
@@ -71,6 +80,96 @@ class SyncService extends ChangeNotifier {
 
   void removeSyncCompleteCallback(Function() callback) {
     _onSyncCompleteCallbacks.remove(callback);
+  }
+
+  /// Register callback for when conflicts are detected
+  void setConflictCallback(Function(List<SyncConflict>)? callback) {
+    _onConflictsDetected = callback;
+  }
+
+  /// Resolve a conflict - either delete locally or restore to cloud
+  Future<bool> resolveConflict(SyncConflict conflict, ConflictResolution resolution) async {
+    switch (resolution) {
+      case ConflictResolution.deleteLocally:
+        // Accept server deletion - remove from local DB
+        if (conflict.type == SyncConflictType.itemDeletedOnServer) {
+          await _itemsRepo.deleteItem(conflict.localId);
+        } else {
+          await _bundlesRepo.deleteBundle(conflict.localId);
+        }
+        _pendingConflicts.remove(conflict);
+        notifyListeners();
+        return true;
+        
+      case ConflictResolution.restoreToCloud:
+        // Push local version back to server
+        if (conflict.type == SyncConflictType.itemDeletedOnServer && conflict.item != null) {
+          final success = await _restoreItemToCloud(conflict.item!);
+          if (success) {
+            _pendingConflicts.remove(conflict);
+            notifyListeners();
+          }
+          return success;
+        } else if (conflict.bundle != null) {
+          final success = await _restoreBundleToCloud(conflict.bundle!);
+          if (success) {
+            _pendingConflicts.remove(conflict);
+            notifyListeners();
+          }
+          return success;
+        }
+        return false;
+        
+      case ConflictResolution.skip:
+        // Do nothing for now
+        return true;
+    }
+  }
+
+  /// Restore item to cloud (re-create it)
+  Future<bool> _restoreItemToCloud(Item item) async {
+    try {
+      final response = await _apiService.post('/items', item.toServerJson());
+      if (response.success && response.data != null) {
+        // Update local item with new server ID
+        final newServerId = response.data['id'];
+        await _itemsRepo.updateItem(item.copyWith(
+          serverId: newServerId,
+          syncStatus: SyncStatus.synced,
+        ));
+        print('[SyncService] Restored item to cloud: ${item.name}');
+        return true;
+      }
+    } catch (e) {
+      print('[SyncService] Error restoring item: $e');
+    }
+    return false;
+  }
+
+  /// Restore bundle to cloud (re-create it)
+  Future<bool> _restoreBundleToCloud(Bundle bundle) async {
+    try {
+      final response = await _apiService.post('/bundles', bundle.toServerJson());
+      if (response.success && response.data != null) {
+        // Update local bundle with new server ID
+        final newServerId = response.data['id'];
+        await _bundlesRepo.updateBundle(bundle.copyWith(
+          serverId: newServerId,
+          syncStatus: SyncStatus.synced,
+        ));
+        print('[SyncService] Restored bundle to cloud: ${bundle.name}');
+        return true;
+      }
+    } catch (e) {
+      print('[SyncService] Error restoring bundle: $e');
+    }
+    return false;
+  }
+
+  /// Clear all pending conflicts
+  void clearConflicts() {
+    _pendingConflicts.clear();
+    notifyListeners();
   }
 
   void _onConnectivityChanged() {
@@ -358,7 +457,7 @@ class SyncService extends ChangeNotifier {
       print('[SyncService] Bundles response: ${bundlesResponse.success}, Items response: ${itemsResponse.success}');
 
       if (bundlesResponse.success || itemsResponse.success) {
-        // Track server IDs for deletion cleanup
+        // Track server IDs for deletion/conflict detection
         final Set<int> serverBundleIds = {};
         final Set<int> serverItemIds = {};
         
@@ -376,8 +475,8 @@ class SyncService extends ChangeNotifier {
             }).toList();
             await _bundlesRepo.mergeServerBundles(bundleModels);
           }
-          // Delete local bundles that no longer exist on server
-          await _bundlesRepo.deleteNonServerBundles(serverBundleIds);
+          // Detect conflicts and delete non-conflicting bundles
+          await _detectBundleConflicts(serverBundleIds);
         }
 
         // Merge items from server
@@ -394,8 +493,8 @@ class SyncService extends ChangeNotifier {
             }).toList();
             await _itemsRepo.mergeServerItems(itemModels);
           }
-          // Delete local items that no longer exist on server
-          await _itemsRepo.deleteNonServerItems(serverItemIds);
+          // Detect conflicts and delete non-conflicting items
+          await _detectItemConflicts(serverItemIds);
         }
 
         // Update last sync timestamp
@@ -408,6 +507,12 @@ class SyncService extends ChangeNotifier {
         // Notify callbacks
         for (final callback in _onSyncCompleteCallbacks) {
           callback();
+        }
+
+        // Notify about conflicts if any were detected
+        if (_pendingConflicts.isNotEmpty && _onConflictsDetected != null) {
+          print('[SyncService] Detected ${_pendingConflicts.length} conflicts');
+          _onConflictsDetected!(_pendingConflicts);
         }
 
         _isSyncing = false;
@@ -427,6 +532,52 @@ class SyncService extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Detect bundle conflicts: items with pending local changes that were deleted on server
+  Future<void> _detectBundleConflicts(Set<int> serverBundleIds) async {
+    final localBundles = await _bundlesRepo.getPendingSyncedBundles();
+    
+    for (final bundle in localBundles) {
+      if (bundle.serverId != null && !serverBundleIds.contains(bundle.serverId)) {
+        // This bundle was deleted on server but has pending local changes
+        print('[SyncService] Conflict detected: Bundle "${bundle.name}" deleted on server but has local changes');
+        _pendingConflicts.add(SyncConflict(
+          type: SyncConflictType.bundleDeletedOnServer,
+          localId: bundle.id,
+          serverId: bundle.serverId,
+          name: bundle.name,
+          localUpdatedAt: bundle.updatedAt,
+          bundle: bundle,
+        ));
+      }
+    }
+    
+    // Also delete bundles without pending changes
+    await _bundlesRepo.deleteNonServerBundlesExcept(serverBundleIds, _pendingConflicts.map((c) => c.localId).toSet());
+  }
+
+  /// Detect item conflicts: items with pending local changes that were deleted on server
+  Future<void> _detectItemConflicts(Set<int> serverItemIds) async {
+    final localItems = await _itemsRepo.getPendingSyncedItems();
+    
+    for (final item in localItems) {
+      if (item.serverId != null && !serverItemIds.contains(item.serverId)) {
+        // This item was deleted on server but has pending local changes
+        print('[SyncService] Conflict detected: Item "${item.name}" deleted on server but has local changes');
+        _pendingConflicts.add(SyncConflict(
+          type: SyncConflictType.itemDeletedOnServer,
+          localId: item.id,
+          serverId: item.serverId,
+          name: item.name,
+          localUpdatedAt: item.updatedAt,
+          item: item,
+        ));
+      }
+    }
+    
+    // Also delete items without pending changes
+    await _itemsRepo.deleteNonServerItemsExcept(serverItemIds, _pendingConflicts.map((c) => c.localId).toSet());
   }
 
   @override
