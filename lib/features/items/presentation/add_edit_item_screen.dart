@@ -43,7 +43,11 @@ final List<String> _categories = [
     super.initState();
     _nameController = TextEditingController(text: widget.item?.name ?? '');
     _detailsController = TextEditingController(text: widget.item?.details ?? '');
-    _selectedCategory = widget.item?.category;
+    // Ensure category exists in list, default to null if not
+    final itemCategory = widget.item?.category;
+    _selectedCategory = (itemCategory != null && _categories.contains(itemCategory)) 
+        ? itemCategory 
+        : null;
     _selectedBundleId = widget.item?.bundleId;
     _imagePath = widget.item?.imagePath;
     
@@ -214,7 +218,7 @@ final List<String> _categories = [
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                initialValue: _selectedCategory,
+                value: _selectedCategory,
                 decoration: const InputDecoration(
                   labelText: 'Category',
                   border: OutlineInputBorder(),
@@ -235,8 +239,12 @@ final List<String> _categories = [
               Consumer<BundlesProvider>(
                 builder: (context, bundlesProvider, child) {
                   final bundles = bundlesProvider.bundles;
+                  // Validate bundleId exists, otherwise set to null
+                  final validBundleId = (bundles.any((b) => b.id == _selectedBundleId))
+                      ? _selectedBundleId
+                      : null;
                   return DropdownButtonFormField<String>(
-                    initialValue: _selectedBundleId,
+                    value: validBundleId,
                     decoration: const InputDecoration(
                       labelText: 'Current Bundle',
                       border: OutlineInputBorder(),

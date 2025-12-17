@@ -30,8 +30,8 @@ class SyncService extends ChangeNotifier {
   // Conflicts detected during sync (items/bundles deleted on server with pending local changes)
   final List<SyncConflict> _pendingConflicts = [];
   
-  // Sync interval: 5 minutes
-  static const Duration _syncInterval = Duration(minutes: 5);
+  // Sync interval: 30 seconds
+  static const Duration _syncInterval = Duration(seconds: 30);
   
   // Callbacks for notifying repositories
   final List<Function()> _onSyncCompleteCallbacks = [];
