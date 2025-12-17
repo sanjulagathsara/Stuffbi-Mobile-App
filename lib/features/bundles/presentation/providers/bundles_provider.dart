@@ -148,6 +148,7 @@ class BundlesProvider extends ChangeNotifier {
 
   Future<void> moveItemsToBundle(String targetBundleId, List<String> itemIds) async {
     await _repository.addItemsToBundle(targetBundleId, itemIds);
+    _syncService.scheduleSync(); // Trigger sync to backend
     
     // Find bundle name for log
     try {
@@ -167,6 +168,7 @@ class BundlesProvider extends ChangeNotifier {
 
   Future<void> removeItemsFromBundle(List<String> itemIds) async {
     await _repository.removeItemsFromBundle(itemIds);
+    _syncService.scheduleSync(); // Trigger sync to backend
     
     try {
       await _activityRepository.logActivity(ActivityLog(
