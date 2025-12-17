@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../auth/data/auth_api.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -19,10 +20,59 @@ class _SplashScreenState extends State<SplashScreen>
     curve: Curves.easeOutCubic,
   );
 
+  final AuthApi _authApi = AuthApi();
+  bool _isCheckingAuth = false;
+
   @override
   void dispose() {
     _ac.dispose();
     super.dispose();
+  }
+
+  /// Check if user has a valid (non-expired) token and navigate accordingly
+  Future<void> _handleStart() async {
+    setState(() => _isCheckingAuth = true);
+
+    try {
+      // First check if token exists
+      final hasToken = await _authApi.isLoggedIn();
+      
+      if (!mounted) return;
+
+      if (!hasToken) {
+        // No token - go to login
+        context.go('/login');
+        return;
+      }
+
+      // Token exists - validate it by calling /auth/me
+      // If token is expired, this will throw an exception
+      try {
+        await _authApi.getMe();
+        
+        if (!mounted) return;
+        
+        // Token is valid - go directly to bundles
+        context.go('/bundles');
+      } catch (e) {
+        // Token is invalid/expired - clear it and go to login
+        debugPrint('Token validation failed: $e');
+        await _authApi.logout(); // Clear the expired token
+        
+        if (!mounted) return;
+        context.go('/login');
+      }
+    } catch (e) {
+      // On error, fall back to login screen
+      debugPrint('Auth check error: $e');
+      if (mounted) {
+        context.go('/login');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isCheckingAuth = false);
+      }
+    }
   }
 
   @override
@@ -46,7 +96,6 @@ class _SplashScreenState extends State<SplashScreen>
                     'Personal Inventory Management System',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      // withOpacity → withValues
                       color: const Color(0xFF0F172A).withValues(alpha: 0.6),
                     ),
                   ),
@@ -61,8 +110,17 @@ class _SplashScreenState extends State<SplashScreen>
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      onPressed: () => context.go('/login'),
-                      child: const Text('Start'),
+                      onPressed: _isCheckingAuth ? null : _handleStart,
+                      child: _isCheckingAuth
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Start'),
                     ),
                   ),
                 ],
