@@ -306,6 +306,12 @@ class ItemsRepositoryImpl {
   /// Returns the server ID if successful, null otherwise
   /// Also updates local item with server ID
   Future<int?> createItemOnServer(Item item, {int? bundleServerId}) async {
+    // Don't create if item already has a server ID
+    if (item.serverId != null) {
+      print('[ItemsRepo] Item already has server ID ${item.serverId}, skipping create');
+      return item.serverId;
+    }
+    
     try {
       print('[ItemsRepo] Creating item ${item.name} on server');
       

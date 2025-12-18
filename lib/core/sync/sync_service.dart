@@ -203,7 +203,8 @@ class SyncService extends ChangeNotifier {
     });
   }
 
-  /// Perform full bidirectional sync
+  /// Perform full bidirectional sync using direct CRUD APIs
+  /// This replaces the old /sync endpoint with direct POST/PUT/DELETE calls
   Future<bool> performSync() async {
     // Check if user is logged in
     final isLoggedIn = await _apiService.isLoggedIn();
@@ -229,72 +230,258 @@ class SyncService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      debugPrint('[SyncService] Starting sync...');
+      debugPrint('[SyncService] Starting sync with direct APIs...');
 
-      // Get pending items from repositories
-      final pendingItems = await _itemsRepo.getPendingItems();
-      final pendingItemDeletes = await _itemsRepo.getPendingDeleteIds();
-      final pendingBundles = await _bundlesRepo.getPendingBundles();
-      final pendingBundleDeletes = await _bundlesRepo.getPendingDeleteIds();
+      // === STEP 1: Fetch server data first to get latest updated_at timestamps ===
+      debugPrint('[SyncService] Step 1: Fetching server bundles...');
+      final serverBundlesResponse = await _apiService.get('/bundles');
+      final serverBundles = serverBundlesResponse.success 
+          ? (serverBundlesResponse.data as List<dynamic>?) ?? []
+          : [];
+      
+      debugPrint('[SyncService] Step 2: Fetching server items...');
+      final serverItemsResponse = await _apiService.get('/items');
+      final serverItems = serverItemsResponse.success 
+          ? (serverItemsResponse.data as List<dynamic>?) ?? []
+          : [];
 
-      debugPrint('[SyncService] Pending: ${pendingItems.length} items, ${pendingBundles.length} bundles');
-      debugPrint('[SyncService] Pending deletes: ${pendingItemDeletes.length} items, ${pendingBundleDeletes.length} bundles');
-
-      // Build sync request
-      final syncRequest = {
-        'items': {
-          'created': pendingItems.where((i) => i.serverId == null).map((i) => i.toServerJson()).toList(),
-          'updated': pendingItems.where((i) => i.serverId != null).map((i) => i.toServerJson()).toList(),
-          'deleted': pendingItemDeletes,
-        },
-        'bundles': {
-          'created': pendingBundles.where((b) => b.serverId == null).map((b) => b.toServerJson()).toList(),
-          'updated': pendingBundles.where((b) => b.serverId != null).map((b) => b.toServerJson()).toList(),
-          'deleted': pendingBundleDeletes,
-        },
-        'activity_logs': [],
-        'last_sync_at': _lastSyncAt?.toIso8601String(),
-      };
-
-      debugPrint('[SyncService] Sync request: $syncRequest');
-
-      // Push/pull sync
-      final response = await _apiService.post('/sync', syncRequest);
-
-      debugPrint('[SyncService] Sync response: ${response.success} - ${response.data}');
-
-      if (response.success) {
-        // Process server response
-        await _processSyncResponse(response.data);
-
-        // Update last sync timestamp
-        _lastSyncAt = DateTime.now();
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('last_sync_at', _lastSyncAt!.toIso8601String());
-
-        debugPrint('[SyncService] Sync completed successfully');
-
-        // Notify callbacks
-        for (final callback in _onSyncCompleteCallbacks) {
-          callback();
+      // Build server timestamp maps (serverId -> updated_at)
+      final serverBundleTimestamps = <int, DateTime>{};
+      for (final b in serverBundles) {
+        final id = b['id'] as int?;
+        final updatedAt = b['updated_at'] != null ? DateTime.tryParse(b['updated_at'].toString()) : null;
+        if (id != null && updatedAt != null) {
+          serverBundleTimestamps[id] = updatedAt;
         }
-
-        _isSyncing = false;
-        notifyListeners();
-        return true;
-      } else {
-        _lastError = response.error ?? 'Unknown sync error';
-        debugPrint('[SyncService] Sync failed: $_lastError');
-        _isSyncing = false;
-        notifyListeners();
-        return false;
       }
+
+      final serverItemTimestamps = <int, DateTime>{};
+      for (final item in serverItems) {
+        final id = item['id'] as int?;
+        final updatedAt = item['updated_at'] != null ? DateTime.tryParse(item['updated_at'].toString()) : null;
+        if (id != null && updatedAt != null) {
+          serverItemTimestamps[id] = updatedAt;
+        }
+      }
+
+      // === STEP 2: Sync pending bundles using direct APIs ===
+      debugPrint('[SyncService] Step 3: Syncing pending bundles...');
+      await _syncPendingBundles(serverBundleTimestamps);
+
+      // === STEP 3: Sync pending items using direct APIs ===
+      debugPrint('[SyncService] Step 4: Syncing pending items...');
+      await _syncPendingItems(serverItemTimestamps);
+
+      // === STEP 4: Handle pending deletes ===
+      debugPrint('[SyncService] Step 5: Processing deletes...');
+      await _syncPendingDeletes();
+
+      // === STEP 5: Merge server changes into local DB ===
+      debugPrint('[SyncService] Step 6: Merging server changes...');
+      await _bundlesRepo.fetchBundlesFromServer();
+      await _itemsRepo.fetchItemsFromServer();
+
+      // Update last sync timestamp
+      _lastSyncAt = DateTime.now();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('last_sync_at', _lastSyncAt!.toIso8601String());
+
+      debugPrint('[SyncService] Sync completed successfully');
+
+      // Notify callbacks
+      for (final callback in _onSyncCompleteCallbacks) {
+        callback();
+      }
+
+      _isSyncing = false;
+      notifyListeners();
+      return true;
     } catch (e) {
       _lastError = e.toString();
       debugPrint('[SyncService] Sync error: $e');
       _isSyncing = false;
       notifyListeners();
       return false;
+    }
+  }
+
+  /// Sync pending bundles using POST /bundles and PUT /bundles/:id
+  Future<void> _syncPendingBundles(Map<int, DateTime> serverTimestamps) async {
+    final pendingBundles = await _bundlesRepo.getPendingBundles();
+    debugPrint('[SyncService] Found ${pendingBundles.length} pending bundles');
+
+    for (final bundle in pendingBundles) {
+      try {
+        if (bundle.serverId == null) {
+          // NEW bundle - POST to create
+          debugPrint('[SyncService] Creating new bundle: ${bundle.name}');
+          final response = await _apiService.post('/bundles', {
+            'title': bundle.name,
+            'subtitle': bundle.description,
+            'image_url': bundle.imagePath,
+          });
+
+          if (response.success && response.data != null) {
+            final serverId = response.data['id'] as int?;
+            if (serverId != null) {
+              await _bundlesRepo.markBundleSynced(bundle.id, serverId);
+              // Upload image if needed
+              await _uploadBundleImageIfNeeded(bundle.id, serverId);
+              debugPrint('[SyncService] Bundle created with server ID: $serverId');
+            }
+          } else {
+            debugPrint('[SyncService] Failed to create bundle: ${response.error}');
+          }
+        } else {
+          // EXISTING bundle - check conflict then PUT
+          final serverUpdatedAt = serverTimestamps[bundle.serverId];
+          final localUpdatedAt = bundle.updatedAt;
+
+          // Conflict check: only push if local is newer
+          if (serverUpdatedAt != null && localUpdatedAt != null) {
+            if (localUpdatedAt.isBefore(serverUpdatedAt) || localUpdatedAt.isAtSameMomentAs(serverUpdatedAt)) {
+              debugPrint('[SyncService] Skipping bundle ${bundle.name} - server has newer version');
+              // Mark as synced since server wins
+              await _bundlesRepo.markBundleSynced(bundle.id, bundle.serverId!);
+              continue;
+            }
+          }
+
+          debugPrint('[SyncService] Updating bundle: ${bundle.name}');
+          final response = await _apiService.put('/bundles/${bundle.serverId}', {
+            'title': bundle.name,
+            'subtitle': bundle.description,
+            'image_url': bundle.imagePath,
+          });
+
+          if (response.success) {
+            await _bundlesRepo.markBundleSynced(bundle.id, bundle.serverId!);
+            debugPrint('[SyncService] Bundle updated successfully');
+          } else {
+            debugPrint('[SyncService] Failed to update bundle: ${response.error}');
+          }
+        }
+      } catch (e) {
+        debugPrint('[SyncService] Error syncing bundle ${bundle.name}: $e');
+      }
+    }
+  }
+
+  /// Sync pending items using POST /items and PUT /items/:id
+  Future<void> _syncPendingItems(Map<int, DateTime> serverTimestamps) async {
+    final pendingItems = await _itemsRepo.getPendingItems();
+    debugPrint('[SyncService] Found ${pendingItems.length} pending items');
+
+    for (final item in pendingItems) {
+      try {
+        // Get bundle's server ID for the request
+        int? bundleServerId;
+        if (item.bundleId != null) {
+          final bundle = await _bundlesRepo.getBundleById(item.bundleId!);
+          bundleServerId = bundle?.serverId;
+        }
+
+        if (item.serverId == null) {
+          // NEW item - POST to create
+          debugPrint('[SyncService] Creating new item: ${item.name}');
+          final response = await _apiService.post('/items', {
+            'name': item.name,
+            'subtitle': item.details,
+            'bundle_id': bundleServerId,
+            'image_url': item.imagePath,
+          });
+
+          if (response.success && response.data != null) {
+            final serverId = response.data['id'] as int?;
+            if (serverId != null) {
+              await _itemsRepo.markItemSynced(item.id, serverId);
+              debugPrint('[SyncService] Item created with server ID: $serverId');
+            }
+          } else {
+            debugPrint('[SyncService] Failed to create item: ${response.error}');
+          }
+        } else {
+          // EXISTING item - check conflict then PUT
+          final serverUpdatedAt = serverTimestamps[item.serverId];
+          final localUpdatedAt = item.updatedAt;
+
+          // Conflict check: only push if local is newer
+          if (serverUpdatedAt != null && localUpdatedAt != null) {
+            if (localUpdatedAt.isBefore(serverUpdatedAt) || localUpdatedAt.isAtSameMomentAs(serverUpdatedAt)) {
+              debugPrint('[SyncService] Skipping item ${item.name} - server has newer version');
+              // Mark as synced since server wins
+              await _itemsRepo.markItemSynced(item.id, item.serverId!);
+              continue;
+            }
+          }
+
+          debugPrint('[SyncService] Updating item: ${item.name}');
+          final response = await _apiService.put('/items/${item.serverId}', {
+            'name': item.name,
+            'subtitle': item.details,
+            'bundle_id': bundleServerId,
+            'image_url': item.imagePath,
+          });
+
+          if (response.success) {
+            await _itemsRepo.markItemSynced(item.id, item.serverId!);
+            debugPrint('[SyncService] Item updated successfully');
+          } else {
+            debugPrint('[SyncService] Failed to update item: ${response.error}');
+          }
+        }
+      } catch (e) {
+        debugPrint('[SyncService] Error syncing item ${item.name}: $e');
+      }
+    }
+  }
+
+  /// Sync pending deletes using DELETE /items/:id and DELETE /bundles/:id
+  Future<void> _syncPendingDeletes() async {
+    // Delete items
+    final pendingItemDeletes = await _itemsRepo.getPendingDeleteIds();
+    debugPrint('[SyncService] Found ${pendingItemDeletes.length} pending item deletes');
+
+    for (final itemId in pendingItemDeletes) {
+      try {
+        final item = await _itemsRepo.getItemById(itemId);
+        if (item?.serverId != null) {
+          debugPrint('[SyncService] Deleting item from server: ${item!.serverId}');
+          final response = await _apiService.delete('/items/${item.serverId}');
+          if (response.success) {
+            await _itemsRepo.markDeleteSynced(itemId);
+            debugPrint('[SyncService] Item deleted from server');
+          }
+        } else {
+          // No server ID means it was never synced, just clean up locally
+          await _itemsRepo.markDeleteSynced(itemId);
+        }
+      } catch (e) {
+        debugPrint('[SyncService] Error deleting item: $e');
+      }
+    }
+
+    // Delete bundles
+    final pendingBundleDeletes = await _bundlesRepo.getPendingDeleteIds();
+    debugPrint('[SyncService] Found ${pendingBundleDeletes.length} pending bundle deletes');
+
+    for (final bundleId in pendingBundleDeletes) {
+      try {
+        final bundle = await _bundlesRepo.getBundleById(bundleId);
+        if (bundle?.serverId != null) {
+          debugPrint('[SyncService] Deleting bundle from server: ${bundle!.serverId}');
+          final response = await _apiService.delete('/bundles/${bundle.serverId}');
+          if (response.success) {
+            await _bundlesRepo.markDeleteSynced(bundleId);
+            debugPrint('[SyncService] Bundle deleted from server');
+          }
+        } else {
+          // No server ID means it was never synced, just clean up locally
+          await _bundlesRepo.markDeleteSynced(bundleId);
+        }
+      } catch (e) {
+        debugPrint('[SyncService] Error deleting bundle: $e');
+      }
     }
   }
 
@@ -372,7 +559,7 @@ class SyncService extends ChangeNotifier {
     }
   }
 
-  /// Pull-only sync (for refresh)
+  /// Pull-only sync (for refresh) using direct GET APIs
   Future<bool> pullChanges() async {
     final isLoggedIn = await _apiService.isLoggedIn();
     if (!isLoggedIn || !_connectivityService.isConnected) {
@@ -380,20 +567,20 @@ class SyncService extends ChangeNotifier {
     }
 
     try {
-      final since = _lastSyncAt?.toIso8601String() ?? DateTime(2000).toIso8601String();
-      final response = await _apiService.get('/sync/pull?since=$since');
-
-      if (response.success) {
-        await _processSyncResponse(response.data);
-        _lastSyncAt = DateTime.now();
-        
-        for (final callback in _onSyncCompleteCallbacks) {
-          callback();
-        }
-        
-        return true;
+      debugPrint('[SyncService] Pulling changes from server...');
+      
+      // Use direct GET APIs instead of /sync/pull
+      await _bundlesRepo.fetchBundlesFromServer();
+      await _itemsRepo.fetchItemsFromServer();
+      
+      _lastSyncAt = DateTime.now();
+      
+      for (final callback in _onSyncCompleteCallbacks) {
+        callback();
       }
-      return false;
+      
+      debugPrint('[SyncService] Pull changes complete');
+      return true;
     } catch (e) {
       debugPrint('[SyncService] Pull error: $e');
       return false;
