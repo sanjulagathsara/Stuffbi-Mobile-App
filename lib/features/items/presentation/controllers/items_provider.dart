@@ -4,7 +4,9 @@ import '../../data/items_repository_impl.dart';
 import '../../models/item_model.dart';
 import '../../../activity/data/activity_repository.dart';
 import '../../../activity/models/activity_log_model.dart';
+import '../../../bundles/data/bundles_repository_impl.dart';
 import '../../../bundles/presentation/providers/bundles_provider.dart';
+import '../../../../core/database/database_helper.dart';
 import '../../../../core/sync/sync_service.dart';
 
 class ItemsProvider extends ChangeNotifier {
@@ -44,6 +46,28 @@ class ItemsProvider extends ChangeNotifier {
     }
   }
 
+  /// Refresh data from server using GET /items API
+  /// Also refreshes bundles first to ensure bundle ID mappings are up to date
+  Future<bool> refreshFromServer() async {
+    debugPrint('[ItemsProvider] Refreshing from server...');
+    try {
+      // Fetch bundles first to ensure bundle ID mappings are available
+      final bundlesRepo = BundlesRepositoryImpl();
+      await bundlesRepo.fetchBundlesFromServer();
+      
+      // Then fetch items
+      final success = await _repository.fetchItemsFromServer();
+      if (success) {
+        await loadItems();
+        debugPrint('[ItemsProvider] Refresh from server complete');
+      }
+      return success;
+    } catch (e) {
+      debugPrint('[ItemsProvider] Error refreshing from server: $e');
+      return false;
+    }
+  }
+
   Future<void> addItem(String name, String category, String details, String? imagePath, String? bundleId) async {
     final newItem = Item(
       id: const Uuid().v4(),
@@ -53,6 +77,8 @@ class ItemsProvider extends ChangeNotifier {
       imagePath: imagePath,
       bundleId: bundleId,
     );
+    
+    // Save locally first (optimistic)
     await _repository.addItem(newItem);
     
     // Log creation
@@ -69,18 +95,84 @@ class ItemsProvider extends ChangeNotifier {
     }
 
     await loadItems();
-    print('[ItemsProvider] Triggering sync after addItem');
-    _syncService.scheduleSync(); // Trigger sync
+    
+    // Try to create on server immediately using POST /items API
+    try {
+      int? bundleServerId;
+      if (bundleId != null) {
+        // Get bundle's server ID from local DB
+        bundleServerId = await _getBundleServerId(bundleId);
+      }
+      
+      final serverId = await _repository.createItemOnServer(newItem, bundleServerId: bundleServerId);
+      if (serverId != null) {
+        debugPrint('[ItemsProvider] Item created on server with ID: $serverId');
+        await loadItems(); // Reload to get updated server ID
+      } else {
+        debugPrint('[ItemsProvider] Failed to create on server, will sync later');
+      }
+    } catch (e) {
+      debugPrint('[ItemsProvider] Error creating on server: $e');
+    }
+  }
+  
+  /// Helper to get bundle's server ID from local database
+  Future<int?> _getBundleServerId(String bundleId) async {
+    try {
+      final db = await DatabaseHelper().database;
+      final maps = await db.query(
+        'bundles',
+        columns: ['server_id'],
+        where: 'id = ?',
+        whereArgs: [bundleId],
+      );
+      if (maps.isNotEmpty) {
+        return maps.first['server_id'] as int?;
+      }
+    } catch (e) {
+      debugPrint('[ItemsProvider] Error getting bundle server ID: $e');
+    }
+    return null;
   }
 
   Future<void> updateItem(Item item) async {
+    // Save locally first (optimistic)
     await _repository.updateItem(item);
     await loadItems();
-    _syncService.scheduleSync(); // Trigger sync
+    
+    // Try to update on server immediately using PUT /items/:id API
+    if (item.serverId != null) {
+      try {
+        final success = await _repository.updateItemOnServer(item);
+        if (success) {
+          debugPrint('[ItemsProvider] Item updated on server');
+        } else {
+          debugPrint('[ItemsProvider] Failed to update on server, will sync later');
+        }
+      } catch (e) {
+        debugPrint('[ItemsProvider] Error updating on server: $e');
+      }
+    }
   }
 
   Future<void> deleteItem(String id) async {
     final item = _items.firstWhere((i) => i.id == id, orElse: () => Item(id: '', name: 'Unknown', category: '', details: ''));
+    
+    // Delete on server first if has serverId (using DELETE /items/:id API)
+    if (item.serverId != null) {
+      try {
+        final success = await _repository.deleteItemOnServer(item.serverId!);
+        if (success) {
+          debugPrint('[ItemsProvider] Item deleted on server');
+        } else {
+          debugPrint('[ItemsProvider] Failed to delete on server');
+        }
+      } catch (e) {
+        debugPrint('[ItemsProvider] Error deleting on server: $e');
+      }
+    }
+    
+    // Delete locally
     await _repository.deleteItem(id);
     
     if (item.id.isNotEmpty) {
@@ -98,7 +190,6 @@ class ItemsProvider extends ChangeNotifier {
     }
 
     await loadItems();
-    _syncService.scheduleSync(); // Trigger sync
   }
 
   Future<void> deleteSelectedItems() async {

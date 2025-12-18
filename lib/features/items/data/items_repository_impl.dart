@@ -301,5 +301,227 @@ class ItemsRepositoryImpl {
       return false;
     }
   }
+
+  /// Create item on server via POST /items
+  /// Returns the server ID if successful, null otherwise
+  /// Also updates local item with server ID
+  Future<int?> createItemOnServer(Item item, {int? bundleServerId}) async {
+    try {
+      print('[ItemsRepo] Creating item ${item.name} on server');
+      
+      final requestBody = {
+        'name': item.name,
+        'subtitle': item.details,
+        'bundle_id': bundleServerId,
+        'image_url': item.imagePath,
+      };
+      
+      final response = await _apiService.post('/items', requestBody);
+      
+      if (response.success && response.data != null) {
+        final serverId = response.data['id'] as int?;
+        if (serverId != null) {
+          // Update local item with server ID and mark as synced
+          final db = await _databaseHelper.database;
+          await db.update(
+            'items',
+            {
+              'server_id': serverId,
+              'sync_status': SyncStatus.synced.toDbString(),
+            },
+            where: 'id = ?',
+            whereArgs: [item.id],
+          );
+          print('[ItemsRepo] Item created on server with ID: $serverId');
+          return serverId;
+        }
+      }
+      print('[ItemsRepo] Failed to create item on server: ${response.error}');
+      return null;
+    } catch (e) {
+      print('[ItemsRepo] Error creating item on server: $e');
+      return null;
+    }
+  }
+
+  /// Update item on server via PUT /items/{serverId}
+  /// Returns true if successful
+  Future<bool> updateItemOnServer(Item item) async {
+    if (item.serverId == null) {
+      print('[ItemsRepo] Cannot update item on server - no server ID');
+      return false;
+    }
+    
+    try {
+      print('[ItemsRepo] Updating item ${item.name} on server');
+      
+      final requestBody = {
+        'name': item.name,
+        'subtitle': item.details,
+        'image_url': item.imagePath,
+      };
+      
+      final response = await _apiService.put('/items/${item.serverId}', requestBody);
+      
+      if (response.success) {
+        // Mark as synced
+        final db = await _databaseHelper.database;
+        await db.update(
+          'items',
+          {'sync_status': SyncStatus.synced.toDbString()},
+          where: 'id = ?',
+          whereArgs: [item.id],
+        );
+        print('[ItemsRepo] Item updated on server successfully');
+        return true;
+      }
+      print('[ItemsRepo] Failed to update item on server: ${response.error}');
+      return false;
+    } catch (e) {
+      print('[ItemsRepo] Error updating item on server: $e');
+      return false;
+    }
+  }
+
+  /// Delete item on server via DELETE /items/{serverId}
+  /// Returns true if successful
+  Future<bool> deleteItemOnServer(int serverId) async {
+    try {
+      print('[ItemsRepo] Deleting item $serverId on server');
+      
+      final response = await _apiService.delete('/items/$serverId');
+      
+      if (response.success) {
+        print('[ItemsRepo] Item deleted on server successfully');
+        return true;
+      }
+      print('[ItemsRepo] Failed to delete item on server: ${response.error}');
+      return false;
+    } catch (e) {
+      print('[ItemsRepo] Error deleting item on server: $e');
+      return false;
+    }
+  }
+
+  /// Fetch all items from server via GET /items and merge with local DB
+  /// This updates local items to match server state
+  Future<bool> fetchItemsFromServer() async {
+    try {
+      print('[ItemsRepo] Fetching items from server via GET /items');
+      
+      final response = await _apiService.get('/items');
+      
+      if (!response.success || response.data == null) {
+        print('[ItemsRepo] Failed to fetch items: ${response.error}');
+        return false;
+      }
+      
+      final serverItems = response.data as List<dynamic>;
+      print('[ItemsRepo] Received ${serverItems.length} items from server');
+      
+      final db = await _databaseHelper.database;
+      
+      // Get all local bundles to map server bundle_id to local bundle id
+      final localBundles = await db.query('bundles');
+      final bundleServerToLocalMap = <int, String>{};
+      for (final b in localBundles) {
+        final serverId = b['server_id'] as int?;
+        final localId = b['id'] as String?;
+        if (serverId != null && localId != null) {
+          bundleServerToLocalMap[serverId] = localId;
+        }
+      }
+      
+      // Track server IDs we've seen
+      final Set<int> serverItemIds = {};
+      
+      for (final serverItem in serverItems) {
+        final serverId = serverItem['id'] as int?;
+        if (serverId == null) continue;
+        
+        serverItemIds.add(serverId);
+        
+        // Map server bundle_id to local bundle id
+        final serverBundleId = serverItem['bundle_id'] as int?;
+        String? localBundleId;
+        if (serverBundleId != null) {
+          localBundleId = bundleServerToLocalMap[serverBundleId];
+          // If bundle mapping not found, use server ID format
+          // This can happen if bundles haven't been synced yet
+          if (localBundleId == null) {
+            localBundleId = 'server_$serverBundleId';
+            print('[ItemsRepo] No local bundle found for server bundle $serverBundleId, using server_$serverBundleId');
+          }
+        }
+        
+        // Check if we have this item locally by server_id
+        final existing = await db.query(
+          'items',
+          where: 'server_id = ?',
+          whereArgs: [serverId],
+        );
+        
+        if (existing.isEmpty) {
+          // New item from server - insert
+          print('[ItemsRepo] Inserting new item from server: ${serverItem['name']}');
+          await db.insert('items', {
+            'id': 'server_$serverId',
+            'name': serverItem['name'] ?? '',
+            'category': '',
+            'bundleId': localBundleId,
+            'imagePath': serverItem['image_url'],
+            'details': serverItem['subtitle'] ?? '',
+            'isSynced': 1,
+            'is_checked': 0,
+            'server_id': serverId,
+            'sync_status': SyncStatus.synced.toDbString(),
+            'updated_at': serverItem['updated_at'],
+          });
+        } else {
+          // Update existing item
+          final localItem = existing.first;
+          final localSyncStatus = localItem['sync_status'] as String?;
+          
+          // Only update if not pending (don't overwrite local changes)
+          if (localSyncStatus != SyncStatus.pending.toDbString()) {
+            print('[ItemsRepo] Updating item from server: ${serverItem['name']}');
+            await db.update(
+              'items',
+              {
+                'name': serverItem['name'] ?? localItem['name'],
+                'bundleId': localBundleId,
+                'imagePath': serverItem['image_url'] ?? localItem['imagePath'],
+                'details': serverItem['subtitle'] ?? localItem['details'],
+                'sync_status': SyncStatus.synced.toDbString(),
+                'updated_at': serverItem['updated_at'],
+              },
+              where: 'server_id = ?',
+              whereArgs: [serverId],
+            );
+          } else {
+            print('[ItemsRepo] Skipping update for pending item: ${serverItem['name']}');
+          }
+        }
+      }
+      
+      // Delete local items that no longer exist on server (and are not pending)
+      final localItems = await db.query('items', where: 'server_id IS NOT NULL AND deleted_at IS NULL');
+      for (final localItem in localItems) {
+        final serverId = localItem['server_id'] as int?;
+        final syncStatus = localItem['sync_status'] as String?;
+        
+        if (serverId != null && !serverItemIds.contains(serverId) && syncStatus != SyncStatus.pending.toDbString()) {
+          print('[ItemsRepo] Deleting item no longer on server: ${localItem['name']}');
+          await db.delete('items', where: 'server_id = ?', whereArgs: [serverId]);
+        }
+      }
+      
+      print('[ItemsRepo] Fetch from server complete');
+      return true;
+    } catch (e) {
+      print('[ItemsRepo] Error fetching items from server: $e');
+      return false;
+    }
+  }
 }
 
