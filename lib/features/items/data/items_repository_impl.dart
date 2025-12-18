@@ -355,10 +355,27 @@ class ItemsRepositoryImpl {
     try {
       print('[ItemsRepo] Updating item ${item.name} on server');
       
+      // Get bundle's server ID from local bundle ID
+      int? bundleServerId;
+      if (item.bundleId != null) {
+        final db = await _databaseHelper.database;
+        final bundleMaps = await db.query(
+          'bundles',
+          columns: ['server_id'],
+          where: 'id = ?',
+          whereArgs: [item.bundleId],
+        );
+        if (bundleMaps.isNotEmpty) {
+          bundleServerId = bundleMaps.first['server_id'] as int?;
+        }
+        print('[ItemsRepo] Mapped local bundle ${item.bundleId} to server bundle $bundleServerId');
+      }
+      
       final requestBody = {
         'name': item.name,
         'subtitle': item.details,
         'image_url': item.imagePath,
+        'bundle_id': bundleServerId,
       };
       
       final response = await _apiService.put('/items/${item.serverId}', requestBody);
