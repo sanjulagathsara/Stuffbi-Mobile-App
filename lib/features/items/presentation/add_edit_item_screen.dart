@@ -27,16 +27,16 @@ class _AddEditItemScreenState extends State<AddEditItemScreen> {
   bool _isNewImage = false; // Track if user picked a new local image
   bool _isUploading = false;
 
-final List<String> _categories = [
-  'Electronics',
-  'Clothing & Accessories',
-  'Books & Stationery',
-  'Home Items',
-  'University / Work Supplies',
-  'Personal Care & Hygiene',
-  'Food & Groceries',
+  final List<String> _categories = [
+    'Electronics',
+    'Clothing & Accessories',
+    'Books & Stationery',
+    'Home Items',
+    'University / Work Supplies',
+    'Personal Care & Hygiene',
+    'Food & Groceries',
   'Other'
-];
+  ];
 
   @override
   void initState() {
@@ -46,11 +46,11 @@ final List<String> _categories = [
     // Ensure category exists in list, default to null if not
     final itemCategory = widget.item?.category;
     _selectedCategory = (itemCategory != null && _categories.contains(itemCategory)) 
-        ? itemCategory 
+        ? itemCategory
         : null;
     _selectedBundleId = widget.item?.bundleId;
     _imagePath = widget.item?.imagePath;
-    
+
     // Load bundles if not already loaded
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<BundlesProvider>(context, listen: false).loadBundles();
@@ -88,10 +88,10 @@ final List<String> _categories = [
   Future<void> _saveItem() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isUploading = true);
-      
+
       try {
         String? finalImagePath = _imagePath;
-        
+
         // If we have a new local image, upload to S3
         if (_isNewImage && _imagePath != null) {
           final s3Url = await S3UploadService().uploadItemImage(File(_imagePath!));
@@ -106,7 +106,7 @@ final List<String> _categories = [
             debugPrint('S3 upload failed, using local path');
           }
         }
-        
+
         final provider = Provider.of<ItemsProvider>(context, listen: false);
         if (widget.item == null) {
           await provider.addItem(
@@ -217,24 +217,33 @@ final List<String> _categories = [
                 },
               ),
               const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _selectedCategory,
+              TextFormField(
+                controller: _detailsController,
                 decoration: const InputDecoration(
-                  labelText: 'Category',
+                  labelText: 'Subtitle',
                   border: OutlineInputBorder(),
                 ),
-                items: _categories.map((category) {
-                  return DropdownMenuItem(
-                    value: category,
-                    child: Text(category),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedCategory = value;
-                  });
-                },
+                maxLines: 1,
               ),
+              // const SizedBox(height: 16),
+              // DropdownButtonFormField<String>(
+              //   value: _selectedCategory,
+              //   decoration: const InputDecoration(
+              //     labelText: 'Category',
+              //     border: OutlineInputBorder(),
+              //   ),
+              //   items: _categories.map((category) {
+              //     return DropdownMenuItem(
+              //       value: category,
+              //       child: Text(category),
+              //     );
+              //   }).toList(),
+              //   onChanged: (value) {
+              //     setState(() {
+              //       _selectedCategory = value;
+              //     });
+              //   },
+              // ),
               const SizedBox(height: 16),
               Consumer<BundlesProvider>(
                 builder: (context, bundlesProvider, child) {
@@ -268,15 +277,6 @@ final List<String> _categories = [
                     },
                   );
                 },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _detailsController,
-                decoration: const InputDecoration(
-                  labelText: 'Details',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
               ),
             ],
           ),
