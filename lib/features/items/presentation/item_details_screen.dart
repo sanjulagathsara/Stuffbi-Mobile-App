@@ -115,11 +115,7 @@ class ItemDetailsScreen extends StatelessWidget {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    Chip(
-                      label: Text(item.category),
-                      backgroundColor: Colors.blue[100],
-                    ),
-                    const SizedBox(width: 8),
+                    
                     if (item.bundleId != null)
                       Consumer<BundlesProvider>(
                         builder: (context, bundlesProvider, child) {
@@ -137,7 +133,7 @@ class ItemDetailsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'Details',
+                  'Subtitle',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,

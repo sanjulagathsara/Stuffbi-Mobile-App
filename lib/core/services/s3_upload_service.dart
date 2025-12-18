@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:mime/mime.dart';
 import '../network/api_service.dart';
@@ -58,9 +57,10 @@ class S3UploadService {
     }
   }
 
-  /// Upload a bundle image to S3
+  /// Upload a bundle image to S3 using the bundle's server ID
   /// Returns the S3 URL to store in the database, or null on failure
-  Future<String?> uploadBundleImage(File imageFile) async {
+  /// Requires bundleServerId to ensure images are saved to bundles/{bundleId}/ folder
+  Future<String?> uploadBundleImage(File imageFile, {required int bundleServerId}) async {
     try {
       // 1. Get content type
       final contentType = _getContentType(imageFile.path);
@@ -69,9 +69,10 @@ class S3UploadService {
         return null;
       }
 
-      // 2. Get presigned upload URL from backend (for new bundles)
+      // 2. Get presigned upload URL from backend using bundle ID
+      // This ensures images are saved to bundles/{bundleId}/ folder (same as web frontend)
       final presignResponse = await _apiService.post(
-        '/bundles/image/presign',
+        '/bundles/$bundleServerId/image/presign',
         {'contentType': contentType},
       );
 

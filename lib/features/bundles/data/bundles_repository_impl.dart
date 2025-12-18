@@ -1,10 +1,15 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/sync/sync_status.dart';
+import '../../../../core/network/api_service.dart';
+import '../../items/data/items_repository_impl.dart';
 import '../models/bundle_model.dart';
 
 class BundlesRepositoryImpl {
   final DatabaseHelper _databaseHelper = DatabaseHelper();
+  final ItemsRepositoryImpl _itemsRepo = ItemsRepositoryImpl();
+  final ApiService _apiService = ApiService();
 
   /// Get all bundles (excluding soft-deleted)
   Future<List<Bundle>> getBundles() async {
@@ -74,13 +79,66 @@ class BundlesRepositoryImpl {
     );
   }
 
-  /// Add items to bundle (marks items as pending sync)
+  /// Add items to bundle
+  /// For items with serverId, calls API directly to update bundle_id
+  /// For items without serverId, marks as pending (sync will handle creation)
   Future<void> addItemsToBundle(String bundleId, List<String> itemIds) async {
     final db = await _databaseHelper.database;
     final now = DateTime.now().toIso8601String();
-    await db.transaction((txn) async {
-      for (String itemId in itemIds) {
-        await txn.update(
+    
+    // Get the bundle's server ID (needed for API call)
+    final bundleMaps = await db.query(
+      'bundles',
+      columns: ['server_id'],
+      where: 'id = ?',
+      whereArgs: [bundleId],
+    );
+    final int? bundleServerId = bundleMaps.isNotEmpty ? bundleMaps.first['server_id'] as int? : null;
+    
+    for (String itemId in itemIds) {
+      // Get item's server ID
+      final itemMaps = await db.query(
+        'items',
+        columns: ['server_id'],
+        where: 'id = ?',
+        whereArgs: [itemId],
+      );
+      final int? itemServerId = itemMaps.isNotEmpty ? itemMaps.first['server_id'] as int? : null;
+      
+      // If both item and bundle have server IDs, call API directly
+      if (itemServerId != null && bundleServerId != null) {
+        debugPrint('[BundlesRepo] Updating item $itemId bundle via API (item server: $itemServerId, bundle server: $bundleServerId)');
+        final success = await _itemsRepo.updateItemBundleOnServer(itemServerId, bundleServerId);
+        
+        if (success) {
+          // API call succeeded, mark as synced
+          await db.update(
+            'items',
+            {
+              'bundleId': bundleId,
+              'sync_status': SyncStatus.synced.toDbString(),
+              'updated_at': now,
+            },
+            where: 'id = ?',
+            whereArgs: [itemId],
+          );
+        } else {
+          // API call failed, mark as pending for retry
+          await db.update(
+            'items',
+            {
+              'bundleId': bundleId,
+              'sync_status': SyncStatus.pending.toDbString(),
+              'updated_at': now,
+            },
+            where: 'id = ?',
+            whereArgs: [itemId],
+          );
+        }
+      } else {
+        // No server IDs, just update locally and mark pending for sync
+        debugPrint('[BundlesRepo] Updating item $itemId bundle locally (no server IDs yet)');
+        await db.update(
           'items',
           {
             'bundleId': bundleId,
@@ -91,7 +149,7 @@ class BundlesRepositoryImpl {
           whereArgs: [itemId],
         );
       }
-    });
+    }
   }
 
   /// Remove items from bundle (marks items as pending sync)
@@ -308,6 +366,98 @@ class BundlesRepositoryImpl {
           whereArgs: [serverId],
         );
       }
+    }
+  }
+
+  /// Fetch all bundles from server via GET /bundles and merge with local DB
+  Future<bool> fetchBundlesFromServer() async {
+    try {
+      print('[BundlesRepo] Fetching bundles from server via GET /bundles');
+      
+      final response = await _apiService.get('/bundles');
+      
+      if (!response.success || response.data == null) {
+        print('[BundlesRepo] Failed to fetch bundles: ${response.error}');
+        return false;
+      }
+      
+      final serverBundles = response.data as List<dynamic>;
+      print('[BundlesRepo] Received ${serverBundles.length} bundles from server');
+      
+      final db = await _databaseHelper.database;
+      
+      // Track server IDs we've seen
+      final Set<int> serverBundleIds = {};
+      
+      for (final serverBundle in serverBundles) {
+        final serverId = serverBundle['id'] as int?;
+        if (serverId == null) continue;
+        
+        serverBundleIds.add(serverId);
+        
+        // Check if we have this bundle locally by server_id
+        final existing = await db.query(
+          'bundles',
+          where: 'server_id = ?',
+          whereArgs: [serverId],
+        );
+        
+        if (existing.isEmpty) {
+          // New bundle from server - insert
+          print('[BundlesRepo] Inserting new bundle from server: ${serverBundle['title']}');
+          await db.insert('bundles', {
+            'id': 'server_$serverId',
+            'name': serverBundle['title'] ?? '',
+            'description': serverBundle['subtitle'] ?? '',
+            'imagePath': serverBundle['image_url'],
+            'isFavorite': 0,
+            'server_id': serverId,
+            'sync_status': SyncStatus.synced.toDbString(),
+            'updated_at': serverBundle['updated_at'],
+          });
+        } else {
+          // Update existing bundle
+          final localBundle = existing.first;
+          final localSyncStatus = localBundle['sync_status'] as String?;
+          
+          // Only update if not pending (don't overwrite local changes)
+          if (localSyncStatus != SyncStatus.pending.toDbString()) {
+            print('[BundlesRepo] Updating bundle from server: ${serverBundle['title']}');
+            await db.update(
+              'bundles',
+              {
+                'name': serverBundle['title'] ?? localBundle['name'],
+                'description': serverBundle['subtitle'] ?? localBundle['description'],
+                'imagePath': serverBundle['image_url'] ?? localBundle['imagePath'],
+                'sync_status': SyncStatus.synced.toDbString(),
+                'updated_at': serverBundle['updated_at'],
+              },
+              where: 'server_id = ?',
+              whereArgs: [serverId],
+            );
+          } else {
+            print('[BundlesRepo] Skipping update for pending bundle: ${serverBundle['title']}');
+          }
+        }
+      }
+      
+      // Delete local bundles that no longer exist on server (and are not pending)
+      final localBundles = await db.query('bundles', where: 'server_id IS NOT NULL AND deleted_at IS NULL');
+      for (final localBundle in localBundles) {
+        final serverId = localBundle['server_id'] as int?;
+        final syncStatus = localBundle['sync_status'] as String?;
+        
+        if (serverId != null && !serverBundleIds.contains(serverId) && syncStatus != SyncStatus.pending.toDbString()) {
+          print('[BundlesRepo] Deleting bundle no longer on server: ${localBundle['name']}');
+          await db.delete('bundles', where: 'server_id = ?', whereArgs: [serverId]);
+        }
+      }
+      
+      print('[BundlesRepo] Fetch from server complete');
+      return true;
+    } catch (e) {
+      print('[BundlesRepo] Error fetching bundles from server: $e');
+      return false;
     }
   }
 }

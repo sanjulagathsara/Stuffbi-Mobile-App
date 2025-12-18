@@ -83,19 +83,33 @@ class _AddEditBundleScreenState extends State<AddEditBundleScreen> {
         
         String? finalImagePath = _existingImageUrl; // Start with existing URL if any
         
-        // If we have a new local image, upload to S3
+        // Handle image upload based on whether bundle has a server ID
         if (_isNewImage && _imageFile != null) {
-          final s3Url = await S3UploadService().uploadBundleImage(_imageFile!);
-          if (s3Url != null) {
-            // Store S3 URL for sync - this is what gets saved to backend
-            finalImagePath = s3Url;
-            // Cache local file path for immediate display
-            ImageUrlService().cacheLocalFile(s3Url, _imageFile!.path);
-            debugPrint('S3 upload successful: $s3Url, cached local path for display');
+          // Check if we have a server ID to use for S3 upload
+          final serverId = widget.bundle?.serverId;
+          
+          if (serverId != null) {
+            // Existing bundle with server ID - upload to S3 immediately
+            final s3Url = await S3UploadService().uploadBundleImage(
+              _imageFile!,
+              bundleServerId: serverId,
+            );
+            if (s3Url != null) {
+              // Store S3 URL for sync - this is what gets saved to backend
+              finalImagePath = s3Url;
+              // Cache local file path for immediate display
+              ImageUrlService().cacheLocalFile(s3Url, _imageFile!.path);
+              debugPrint('S3 upload successful: $s3Url, cached local path for display');
+            } else {
+              // S3 upload failed, use local path
+              debugPrint('S3 upload failed, using local path');
+              finalImagePath = _imageFile?.path;
+            }
           } else {
-            // S3 upload failed, use local path
-            debugPrint('S3 upload failed, using local path');
-            finalImagePath = _imageFile?.path;
+            // New bundle (no server ID yet) - store local path
+            // Image will be uploaded to S3 when bundle syncs and gets a server ID
+            finalImagePath = _imageFile!.path;
+            debugPrint('New bundle: storing local image path, will upload after sync');
           }
         } else if (_imageFile != null && !_isNewImage) {
           // Existing local file (not a URL)
@@ -247,10 +261,10 @@ class _AddEditBundleScreenState extends State<AddEditBundleScreen> {
               TextFormField(
                 controller: _descriptionController,
                 decoration: const InputDecoration(
-                  labelText: 'Description',
+                  labelText: 'Subtitle',
                   border: OutlineInputBorder(),
                 ),
-                maxLines: 3,
+                maxLines: 1,
               ),
               const SizedBox(height: 24),
               const Text(

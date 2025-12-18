@@ -77,6 +77,23 @@ class BundlesProvider extends ChangeNotifier {
     }
   }
 
+  /// Refresh data from server using GET /bundles API
+  /// This fetches latest bundles from server and merges with local data
+  Future<bool> refreshFromServer() async {
+    debugPrint('[BundlesProvider] Refreshing from server...');
+    try {
+      final success = await _repository.fetchBundlesFromServer();
+      if (success) {
+        await loadBundles();
+        debugPrint('[BundlesProvider] Refresh from server complete');
+      }
+      return success;
+    } catch (e) {
+      debugPrint('[BundlesProvider] Error refreshing from server: $e');
+      return false;
+    }
+  }
+
   Future<void> addBundle(String name, String description, String? imagePath, List<String> selectedItemIds) async {
     final newBundle = Bundle(
       id: const Uuid().v4(),
