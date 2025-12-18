@@ -261,10 +261,10 @@ class _AddEditBundleScreenState extends State<AddEditBundleScreen> {
               TextFormField(
                 controller: _descriptionController,
                 decoration: const InputDecoration(
-                  labelText: 'Description',
+                  labelText: 'Subtitle',
                   border: OutlineInputBorder(),
                 ),
-                maxLines: 3,
+                maxLines: 1,
               ),
               const SizedBox(height: 24),
               const Text(
