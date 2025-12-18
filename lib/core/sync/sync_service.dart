@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../network/api_service.dart';
+import '../services/s3_upload_service.dart';
+import '../services/image_url_service.dart';
 import 'connectivity_service.dart';
 import 'sync_status.dart';
 import 'sync_conflict.dart';
@@ -331,14 +334,20 @@ class SyncService extends ChangeNotifier {
       }
     }
 
-    // --- Process CREATED bundles (mark local bundles as synced) ---
+    // --- Process CREATED bundles (mark local bundles as synced + upload images) ---
     if (bundles != null) {
       final createdBundles = bundles['created'] as List<dynamic>?;
       if (createdBundles != null) {
         for (final bundle in createdBundles) {
           if (bundle['client_id'] != null && bundle['id'] != null) {
-            await _bundlesRepo.markBundleSynced(bundle['client_id'], bundle['id']);
-            print('[SyncService] Marked bundle ${bundle['client_id']} as synced with server ID ${bundle['id']}');
+            final clientId = bundle['client_id'] as String;
+            final serverId = bundle['id'] as int;
+            
+            await _bundlesRepo.markBundleSynced(clientId, serverId);
+            print('[SyncService] Marked bundle $clientId as synced with server ID $serverId');
+            
+            // Check if bundle has a local image that needs to be uploaded to S3
+            await _uploadBundleImageIfNeeded(clientId, serverId);
           }
         }
       }
@@ -578,6 +587,44 @@ class SyncService extends ChangeNotifier {
     
     // Also delete items without pending changes
     await _itemsRepo.deleteNonServerItemsExcept(serverItemIds, _pendingConflicts.map((c) => c.localId).toSet());
+  }
+
+  /// Upload bundle image to S3 if it's a local file path
+  /// Called after bundle gets a server ID during sync
+  Future<void> _uploadBundleImageIfNeeded(String clientId, int serverId) async {
+    try {
+      final bundle = await _bundlesRepo.getBundleById(clientId);
+      if (bundle == null || bundle.imagePath == null) return;
+      
+      final imagePath = bundle.imagePath!;
+      
+      // Check if it's a local file path (not an S3 URL)
+      if (!imagePath.startsWith('http') && File(imagePath).existsSync()) {
+        print('[SyncService] Uploading local bundle image to S3 for bundle $clientId');
+        
+        final s3Url = await S3UploadService().uploadBundleImage(
+          File(imagePath),
+          bundleServerId: serverId,
+        );
+        
+        if (s3Url != null) {
+          // Update bundle with S3 URL
+          await _bundlesRepo.updateBundle(bundle.copyWith(
+            imagePath: s3Url,
+            syncStatus: SyncStatus.pending, // Will sync the updated URL on next sync
+          ));
+          
+          // Cache local file for immediate display
+          ImageUrlService().cacheLocalFile(s3Url, imagePath);
+          
+          print('[SyncService] Bundle image uploaded to S3: $s3Url');
+        } else {
+          print('[SyncService] Failed to upload bundle image to S3');
+        }
+      }
+    } catch (e) {
+      print('[SyncService] Error uploading bundle image: $e');
+    }
   }
 
   @override
