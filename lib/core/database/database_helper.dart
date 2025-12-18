@@ -10,7 +10,7 @@ class DatabaseHelper {
 
   factory DatabaseHelper() {
     return _instance;
-  }
+  } 
 
   DatabaseHelper._internal();
 
