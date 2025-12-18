@@ -1,10 +1,12 @@
 import 'package:sqflite/sqflite.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/sync/sync_status.dart';
+import '../../../../core/network/api_service.dart';
 import '../models/item_model.dart';
 
 class ItemsRepositoryImpl {
   final DatabaseHelper _databaseHelper = DatabaseHelper();
+  final ApiService _apiService = ApiService();
 
   /// Get all items (excluding soft-deleted)
   Future<List<Item>> getItems() async {
@@ -272,6 +274,31 @@ class ItemsRepositoryImpl {
           whereArgs: [serverId],
         );
       }
+    }
+  }
+
+  /// Update item's bundle_id directly on server via PUT /items/{serverId}
+  /// This is used when moving items between bundles to avoid sync duplication
+  /// Returns true if successful, false otherwise
+  Future<bool> updateItemBundleOnServer(int itemServerId, int? bundleServerId) async {
+    try {
+      print('[ItemsRepo] Updating item $itemServerId bundle to $bundleServerId on server');
+      
+      final response = await _apiService.put(
+        '/items/$itemServerId',
+        {'bundle_id': bundleServerId},
+      );
+      
+      if (response.success) {
+        print('[ItemsRepo] Successfully updated item bundle on server');
+        return true;
+      } else {
+        print('[ItemsRepo] Failed to update item bundle on server: ${response.error}');
+        return false;
+      }
+    } catch (e) {
+      print('[ItemsRepo] Error updating item bundle on server: $e');
+      return false;
     }
   }
 }

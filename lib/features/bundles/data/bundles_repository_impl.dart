@@ -1,10 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import '../../../../core/database/database_helper.dart';
 import '../../../../core/sync/sync_status.dart';
+import '../../items/data/items_repository_impl.dart';
 import '../models/bundle_model.dart';
 
 class BundlesRepositoryImpl {
   final DatabaseHelper _databaseHelper = DatabaseHelper();
+  final ItemsRepositoryImpl _itemsRepo = ItemsRepositoryImpl();
 
   /// Get all bundles (excluding soft-deleted)
   Future<List<Bundle>> getBundles() async {
@@ -74,13 +77,66 @@ class BundlesRepositoryImpl {
     );
   }
 
-  /// Add items to bundle (marks items as pending sync)
+  /// Add items to bundle
+  /// For items with serverId, calls API directly to update bundle_id
+  /// For items without serverId, marks as pending (sync will handle creation)
   Future<void> addItemsToBundle(String bundleId, List<String> itemIds) async {
     final db = await _databaseHelper.database;
     final now = DateTime.now().toIso8601String();
-    await db.transaction((txn) async {
-      for (String itemId in itemIds) {
-        await txn.update(
+    
+    // Get the bundle's server ID (needed for API call)
+    final bundleMaps = await db.query(
+      'bundles',
+      columns: ['server_id'],
+      where: 'id = ?',
+      whereArgs: [bundleId],
+    );
+    final int? bundleServerId = bundleMaps.isNotEmpty ? bundleMaps.first['server_id'] as int? : null;
+    
+    for (String itemId in itemIds) {
+      // Get item's server ID
+      final itemMaps = await db.query(
+        'items',
+        columns: ['server_id'],
+        where: 'id = ?',
+        whereArgs: [itemId],
+      );
+      final int? itemServerId = itemMaps.isNotEmpty ? itemMaps.first['server_id'] as int? : null;
+      
+      // If both item and bundle have server IDs, call API directly
+      if (itemServerId != null && bundleServerId != null) {
+        debugPrint('[BundlesRepo] Updating item $itemId bundle via API (item server: $itemServerId, bundle server: $bundleServerId)');
+        final success = await _itemsRepo.updateItemBundleOnServer(itemServerId, bundleServerId);
+        
+        if (success) {
+          // API call succeeded, mark as synced
+          await db.update(
+            'items',
+            {
+              'bundleId': bundleId,
+              'sync_status': SyncStatus.synced.toDbString(),
+              'updated_at': now,
+            },
+            where: 'id = ?',
+            whereArgs: [itemId],
+          );
+        } else {
+          // API call failed, mark as pending for retry
+          await db.update(
+            'items',
+            {
+              'bundleId': bundleId,
+              'sync_status': SyncStatus.pending.toDbString(),
+              'updated_at': now,
+            },
+            where: 'id = ?',
+            whereArgs: [itemId],
+          );
+        }
+      } else {
+        // No server IDs, just update locally and mark pending for sync
+        debugPrint('[BundlesRepo] Updating item $itemId bundle locally (no server IDs yet)');
+        await db.update(
           'items',
           {
             'bundleId': bundleId,
@@ -91,7 +147,7 @@ class BundlesRepositoryImpl {
           whereArgs: [itemId],
         );
       }
-    });
+    }
   }
 
   /// Remove items from bundle (marks items as pending sync)
