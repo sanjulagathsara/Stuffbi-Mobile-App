@@ -216,7 +216,7 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
                     final filteredAvailable = _isSearchingToAdd && _searchQuery.isNotEmpty
                         ? availableItems.where((item) => 
                             item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                            item.category.toLowerCase().contains(_searchQuery.toLowerCase())
+                            item.details.toLowerCase().contains(_searchQuery.toLowerCase())
                           ).toList()
                         : availableItems;
 
@@ -264,7 +264,7 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
                                     final isSelected = itemsToAdd.contains(item.id);
                                     return CheckboxListTile(
                                       title: Text(item.name),
-                                      subtitle: Text(item.category),
+                                      subtitle: Text(item.details),
                                       secondary: item.imagePath != null
                                           ? SmartS3Image(
                                               imagePath: item.imagePath,
@@ -535,7 +535,7 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
                     final displayItems = _searchQuery.isNotEmpty && !_isSearchingToAdd
                         ? allBundleItems.where((item) => 
                             item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                            item.category.toLowerCase().contains(_searchQuery.toLowerCase())
+                            item.details.toLowerCase().contains(_searchQuery.toLowerCase())
                           ).toList()
                         : allBundleItems;
 
@@ -916,7 +916,7 @@ class _BundleDetailsScreenState extends State<BundleDetailsScreen> {
                       ),
                     ),
                     Text(
-                      item.category,
+                      item.details,
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     if (item.isChecked && item.lastCheckedAt != null)
