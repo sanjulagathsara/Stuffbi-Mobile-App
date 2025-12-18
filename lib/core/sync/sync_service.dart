@@ -381,6 +381,28 @@ class SyncService extends ChangeNotifier {
           bundleServerId = bundle?.serverId;
         }
 
+        // Upload image to S3 first if it's a local file path
+        String? imageUrlToSync = item.imagePath;
+        if (item.imagePath != null && 
+            !item.imagePath!.startsWith('http') && 
+            File(item.imagePath!).existsSync()) {
+          debugPrint('[SyncService] Uploading local item image to S3 before sync: ${item.name}');
+          final s3Url = await S3UploadService().uploadItemImage(File(item.imagePath!));
+          if (s3Url != null) {
+            imageUrlToSync = s3Url;
+            // Update local item with S3 URL immediately
+            await _itemsRepo.updateItem(item.copyWith(
+              imagePath: s3Url,
+              syncStatus: SyncStatus.pending,
+            ));
+            // Cache local file for immediate display
+            ImageUrlService().cacheLocalFile(s3Url, item.imagePath!);
+            debugPrint('[SyncService] Item image uploaded to S3: $s3Url');
+          } else {
+            debugPrint('[SyncService] Failed to upload item image to S3, using local path');
+          }
+        }
+
         if (item.serverId == null) {
           // NEW item - POST to create
           debugPrint('[SyncService] Creating new item: ${item.name}');
@@ -388,7 +410,7 @@ class SyncService extends ChangeNotifier {
             'name': item.name,
             'subtitle': item.details,
             'bundle_id': bundleServerId,
-            'image_url': item.imagePath,
+            'image_url': imageUrlToSync,
           });
 
           if (response.success && response.data != null) {
@@ -420,7 +442,7 @@ class SyncService extends ChangeNotifier {
             'name': item.name,
             'subtitle': item.details,
             'bundle_id': bundleServerId,
-            'image_url': item.imagePath,
+            'image_url': imageUrlToSync,
           });
 
           if (response.success) {
@@ -435,6 +457,7 @@ class SyncService extends ChangeNotifier {
       }
     }
   }
+
 
   /// Sync pending deletes using DELETE /items/:id and DELETE /bundles/:id
   Future<void> _syncPendingDeletes() async {
