@@ -7,6 +7,7 @@ class Item {
   final String category;
   final String? bundleId;
   final String? imagePath;
+  final String? cachedImagePath;  // Local cached image path for offline access
   final String details;
   final bool isSynced;
   final bool isChecked;
@@ -24,6 +25,7 @@ class Item {
     required this.category,
     this.bundleId,
     this.imagePath,
+    this.cachedImagePath,
     required this.details,
     this.isSynced = false,
     this.isChecked = false,
@@ -41,6 +43,7 @@ class Item {
       'category': category,
       'bundleId': bundleId,
       'imagePath': imagePath,
+      'cached_image_path': cachedImagePath,
       'details': details,
       'isSynced': isSynced ? 1 : 0,
       'is_checked': isChecked ? 1 : 0,
@@ -59,6 +62,7 @@ class Item {
       category: map['category'],
       bundleId: map['bundleId'],
       imagePath: map['imagePath'],
+      cachedImagePath: map['cached_image_path'],
       details: map['details'],
       isSynced: map['isSynced'] == 1,
       isChecked: map['is_checked'] == 1,
@@ -113,6 +117,7 @@ class Item {
     String? category,
     String? bundleId,
     String? imagePath,
+    String? cachedImagePath,
     String? details,
     bool? isSynced,
     bool? isChecked,
@@ -128,6 +133,7 @@ class Item {
       category: category ?? this.category,
       bundleId: bundleId ?? this.bundleId,
       imagePath: imagePath ?? this.imagePath,
+      cachedImagePath: cachedImagePath ?? this.cachedImagePath,
       details: details ?? this.details,
       isSynced: isSynced ?? this.isSynced,
       isChecked: isChecked ?? this.isChecked,
@@ -146,6 +152,7 @@ class Item {
       category: category,
       bundleId: null,
       imagePath: imagePath,
+      cachedImagePath: cachedImagePath,
       details: details,
       isSynced: isSynced,
       isChecked: isChecked,

@@ -1,9 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../services/image_url_service.dart';
+import '../services/image_cache_service.dart';
+import '../sync/connectivity_service.dart';
 
 /// A widget that displays S3 images by fetching pre-signed URLs from the backend.
 /// For local files or non-S3 URLs, displays them directly.
+/// Supports offline mode by caching images locally.
 class SmartS3Image extends StatefulWidget {
   final String? imagePath;
   final int? itemServerId;    // Server ID for items (used to fetch pre-signed URL)
@@ -32,6 +35,8 @@ class SmartS3Image extends StatefulWidget {
 
 class _SmartS3ImageState extends State<SmartS3Image> {
   final ImageUrlService _imageUrlService = ImageUrlService();
+  final ImageCacheService _imageCacheService = ImageCacheService();
+  final ConnectivityService _connectivityService = ConnectivityService();
   String? _resolvedUrl;
   bool _isLoading = true;
   bool _hasError = false;
@@ -72,6 +77,38 @@ class _SmartS3ImageState extends State<SmartS3Image> {
         });
       }
 
+      // 1. Check local cache first (works offline)
+      final cachedPath = await _imageCacheService.getCachedImagePath(widget.imagePath!);
+      if (cachedPath != null) {
+        debugPrint('[SmartS3Image] Using cached image: $cachedPath');
+        if (mounted) {
+          setState(() {
+            _resolvedUrl = cachedPath;
+            _isLoading = false;
+            _hasError = false;
+          });
+        }
+        
+        // If online, check if we should update the cache in background
+        if (_connectivityService.isConnected) {
+          _updateCacheInBackground();
+        }
+        return;
+      }
+
+      // 2. If offline and no cache, show error immediately
+      if (!_connectivityService.isConnected) {
+        debugPrint('[SmartS3Image] Offline and no cached image for: ${widget.imagePath}');
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _hasError = true;
+          });
+        }
+        return;
+      }
+
+      // 3. Online - fetch pre-signed URL
       String? presignedUrl;
       
       if (widget.itemServerId != null) {
@@ -95,6 +132,18 @@ class _SmartS3ImageState extends State<SmartS3Image> {
         }
       }
 
+      // 4. Download and cache the image for offline use
+      if (presignedUrl != null && presignedUrl.startsWith('http')) {
+        final localCachePath = await _imageCacheService.downloadAndCache(
+          widget.imagePath!,
+          presignedUrl,
+        );
+        if (localCachePath != null) {
+          // Use cached file instead of network URL for faster loading
+          presignedUrl = localCachePath;
+        }
+      }
+
       if (mounted) {
         setState(() {
           _resolvedUrl = presignedUrl;
@@ -111,6 +160,35 @@ class _SmartS3ImageState extends State<SmartS3Image> {
           _hasError = false;
         });
       }
+    }
+  }
+  
+  /// Update cache in background when online (for image changes on server)
+  Future<void> _updateCacheInBackground() async {
+    if (widget.imagePath == null) return;
+    
+    try {
+      String? presignedUrl;
+      
+      if (widget.itemServerId != null) {
+        presignedUrl = await _imageUrlService.getItemImageUrl(
+          widget.itemServerId!,
+          widget.imagePath,
+        );
+      } else if (widget.bundleServerId != null) {
+        presignedUrl = await _imageUrlService.getBundleImageUrl(
+          widget.bundleServerId!,
+          widget.imagePath,
+        );
+      }
+      
+      if (presignedUrl != null && presignedUrl.startsWith('http')) {
+        // Re-download and update cache (will overwrite if URL changed)
+        await _imageCacheService.downloadAndCache(widget.imagePath!, presignedUrl);
+        debugPrint('[SmartS3Image] Background cache update complete');
+      }
+    } catch (e) {
+      debugPrint('[SmartS3Image] Background cache update failed: $e');
     }
   }
 

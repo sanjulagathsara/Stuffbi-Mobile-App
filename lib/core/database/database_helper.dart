@@ -26,7 +26,7 @@ class DatabaseHelper {
     debugPrint('Database path: $path');
     return await openDatabase(
       path,
-      version: 7, // Updated for sync support
+      version: 8, // Updated for offline image caching
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -41,6 +41,7 @@ class DatabaseHelper {
         category TEXT,
         bundleId TEXT,
         imagePath TEXT,
+        cached_image_path TEXT,
         details TEXT,
         isSynced INTEGER,
         is_checked INTEGER DEFAULT 0,
@@ -59,6 +60,7 @@ class DatabaseHelper {
         name TEXT,
         description TEXT,
         imagePath TEXT,
+        cached_image_path TEXT,
         isSynced INTEGER,
         is_favorite INTEGER DEFAULT 0,
         server_id INTEGER,
@@ -206,6 +208,25 @@ class DatabaseHelper {
       await db.execute("UPDATE bundles SET sync_status = 'pending', updated_at = datetime('now') WHERE sync_status IS NULL");
       
       debugPrint('Database upgrade to version 7 complete');
+    }
+    
+    // Add cached_image_path columns for offline image caching
+    if (oldVersion < 8) {
+      debugPrint('Upgrading to version 8: Adding cached_image_path columns...');
+      
+      try {
+        await db.execute('ALTER TABLE items ADD COLUMN cached_image_path TEXT');
+      } catch (e) {
+        debugPrint('cached_image_path column may already exist in items: $e');
+      }
+      
+      try {
+        await db.execute('ALTER TABLE bundles ADD COLUMN cached_image_path TEXT');
+      } catch (e) {
+        debugPrint('cached_image_path column may already exist in bundles: $e');
+      }
+      
+      debugPrint('Database upgrade to version 8 complete');
     }
   }
 }

@@ -6,6 +6,7 @@ class Bundle {
   final String name;
   final String description;
   final String? imagePath;
+  final String? cachedImagePath;  // Local cached image path for offline access
   final bool isSynced;
   final bool isFavorite;
   
@@ -20,6 +21,7 @@ class Bundle {
     required this.name,
     required this.description,
     this.imagePath,
+    this.cachedImagePath,
     this.isSynced = false,
     this.isFavorite = false,
     this.serverId,
@@ -34,6 +36,7 @@ class Bundle {
       'name': name,
       'description': description,
       'imagePath': imagePath,
+      'cached_image_path': cachedImagePath,
       'isSynced': isSynced ? 1 : 0,
       'is_favorite': isFavorite ? 1 : 0,
       'server_id': serverId,
@@ -49,6 +52,7 @@ class Bundle {
       name: map['name'],
       description: map['description'],
       imagePath: map['imagePath'],
+      cachedImagePath: map['cached_image_path'],
       isSynced: map['isSynced'] == 1,
       isFavorite: map['is_favorite'] == 1,
       serverId: map['server_id'],
@@ -93,6 +97,7 @@ class Bundle {
     String? name,
     String? description,
     String? imagePath,
+    String? cachedImagePath,
     bool? isSynced,
     bool? isFavorite,
     int? serverId,
@@ -105,6 +110,7 @@ class Bundle {
       name: name ?? this.name,
       description: description ?? this.description,
       imagePath: imagePath ?? this.imagePath,
+      cachedImagePath: cachedImagePath ?? this.cachedImagePath,
       isSynced: isSynced ?? this.isSynced,
       isFavorite: isFavorite ?? this.isFavorite,
       serverId: serverId ?? this.serverId,
