@@ -33,7 +33,7 @@ class _AppState extends State<App> {
   }
 
   void _onConflictsDetected(List<SyncConflict> conflicts) {
-    // TODO: Conflict resolution dialog temporarily disabled
+    // Conflict resolution dialog box
     // Show dialog when conflicts are detected
     // WidgetsBinding.instance.addPostFrameCallback((_) {
     //   final context = navigatorKey.currentContext;

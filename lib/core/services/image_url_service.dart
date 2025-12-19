@@ -9,14 +9,10 @@ class ImageUrlService {
 
   final ApiService _apiService = ApiService();
   
-  // Cache for pre-signed URLs: key -> {url, expiresAt}
   final Map<String, _CachedUrl> _urlCache = {};
   
-  // Cache for local file paths: s3Url -> localPath
-  // Used for immediate display after upload before sync assigns serverId
   final Map<String, String> _localFileCache = {};
   
-  // Default cache duration (slightly less than S3 2-hour expiry)
   static const Duration _cacheDuration = Duration(hours: 1, minutes: 50);
 
   /// Check if URL is an S3 URL that needs pre-signing
@@ -25,7 +21,6 @@ class ImageUrlService {
     return url.contains('.s3.') && url.contains('amazonaws.com');
   }
 
-  /// Get a viewable URL for an item image
   /// If the URL is an S3 URL, fetches a pre-signed URL from the backend
   /// Caches the result for performance
   Future<String?> getItemImageUrl(int itemId, String? originalUrl) async {

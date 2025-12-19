@@ -232,7 +232,7 @@ class SyncService extends ChangeNotifier {
     try {
       debugPrint('[SyncService] Starting sync with direct APIs...');
 
-      // === STEP 1: Fetch server data first to get latest updated_at timestamps ===
+      // Fetch server data first to get latest updated_at timestamps
       debugPrint('[SyncService] Step 1: Fetching server bundles...');
       final serverBundlesResponse = await _apiService.get('/bundles');
       final serverBundles = serverBundlesResponse.success 
@@ -264,19 +264,19 @@ class SyncService extends ChangeNotifier {
         }
       }
 
-      // === STEP 2: Sync pending bundles using direct APIs ===
+      // Sync pending bundles using direct APIs 
       debugPrint('[SyncService] Step 3: Syncing pending bundles...');
       await _syncPendingBundles(serverBundleTimestamps);
 
-      // === STEP 3: Sync pending items using direct APIs ===
+      // Sync pending items using direct APIs 
       debugPrint('[SyncService] Step 4: Syncing pending items...');
       await _syncPendingItems(serverItemTimestamps);
 
-      // === STEP 4: Handle pending deletes ===
+      //Handle pending deletes 
       debugPrint('[SyncService] Step 5: Processing deletes...');
       await _syncPendingDeletes();
 
-      // === STEP 5: Merge server changes into local DB ===
+      // Merge server changes into local DB
       debugPrint('[SyncService] Step 6: Merging server changes...');
       await _bundlesRepo.fetchBundlesFromServer();
       await _itemsRepo.fetchItemsFromServer();

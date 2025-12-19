@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 /// A widget that displays images from either a network URL or a local file path.
-/// Automatically detects if the path is a URL (http/https) or a local file path.
 class SmartImage extends StatelessWidget {
   final String? imagePath;
   final double? width;
@@ -21,7 +20,6 @@ class SmartImage extends StatelessWidget {
     this.borderRadius,
   }) : super(key: key);
 
-  /// Check if the path is a network URL
   bool get isNetworkImage {
     if (imagePath == null) return false;
     return imagePath!.startsWith('http://') || imagePath!.startsWith('https://');
@@ -36,7 +34,6 @@ class SmartImage extends StatelessWidget {
     Widget imageWidget;
 
     if (isNetworkImage) {
-      // Network image
       imageWidget = Image.network(
         imagePath!,
         width: width,

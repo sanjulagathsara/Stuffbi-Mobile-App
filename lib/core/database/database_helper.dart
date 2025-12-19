@@ -135,11 +135,10 @@ class DatabaseHelper {
       ''');
     }
     
-    // Version 7: Add sync columns
+    // Add sync columns
     if (oldVersion < 7) {
       debugPrint('Upgrading to version 7: Adding sync columns...');
       
-      // Add sync columns to items
       try {
         await db.execute('ALTER TABLE items ADD COLUMN server_id INTEGER');
       } catch (e) {
@@ -161,7 +160,6 @@ class DatabaseHelper {
         debugPrint('deleted_at column may already exist: $e');
       }
       
-      // Add sync columns to bundles
       try {
         await db.execute('ALTER TABLE bundles ADD COLUMN server_id INTEGER');
       } catch (e) {
